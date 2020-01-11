@@ -1,25 +1,25 @@
-# Chapter 1  Database Cluster, Databases, and Tables
+# 第1章 数据库集簇，数据库和表
 
-This chapter and the next chapter summarize the basic knowledge of PostgreSQL to help to read the subsequent chapters. In this chapter, following topics are described:
+本章以及下一章总结了 PostgreSQL 基础知识，以帮助阅读后续的章节。本章主要介绍以下主题：
 
-- The logical structure of a database cluster
-- The physical structure of a database cluster
-- The internal layout of a heap table file
-- The methods of writing and reading data to a table
+- 数据库集群的逻辑结构
+- 数据库集群的物理结构
+- 堆表文件的内部布局
+- 向表写入和读取数据的方法
 
-If you are already familiar with them, you may skip over this chapter.
+如果您已经对这些内容很熟悉，则可以跳过本章。
 
-## 1.1. Logical Structure of Database Cluster
+## 1.1. 数据库集簇的逻辑
 
-A **database cluster** is a collection of *databases* managed by a PostgreSQL server. If you hear this definition now for the first time, you might be wondering about it, but the term ‘database cluster’ in PostgreSQL does **not** mean ‘a group of database servers’. A PostgreSQL server runs on a single host and manages a single database cluster.
+一个**数据库集簇**是指由一个PostgreSQL服务管理的一系列数据库的集合. 如果你是初次听到此定义，你可能会感到疑惑，PostgreSQL中的‘数据库集簇’并**不表示**一组数据库服务，一个PostgreSQL服务运行在在一个主机上，并管理一个独立的数据库集簇。
 
-Figure 1.1 shows the logical structure of a database cluster. A *database* is a collection of *database objects*. In the relational database theory, a *database object* is a data structure used either to store or to reference data. A (heap) *table* is a typical example of it, and there are many more like an index, a sequence, a view, a function and so on. In PostgreSQL, databases themselves are also database objects and are logically separated from each other. All other database objects (e.g., tables, indexes, etc) belong to their respective databases.
+图1.1 展示了一个数据库集簇的逻辑结构。*数据库*是*数据库对象*的集合。在关系数据库理论中，*数据库对象*是一种用于存储或引用数据的数据结构。 其中一个典型的例子是*（堆）表*，还有其他的，例如：索引、序列、试图、函数等等。在PostgreSQL中，数据库本身也是数据库对象，并且数据库之间在逻辑上相互独立。所有其他的数据库对象（比如：表、索引等）都属于相应的数据库。
 
-**Fig. 1.1. Logical structure of a database cluster.**
+**表 1.1. 一个数据库集簇的逻辑结构**
 
 ![Fig. 1.1. Logical structure of a database cluster.](http://www.interdb.jp/pg/img/fig-1-01.png)![img]()
 
-All the database objects in PostgreSQL are internally managed by respective **object identifiers (OIDs)**, which are unsigned 4-byte integers. The relations between database objects and the respective OIDs are stored in appropriate [system catalogs](http://www.postgresql.org/docs/current/static/catalogs.html), depending on the type of objects. For example, OIDs of databases and heap tables are stored in *pg_database* and *pg_class* respectively, so you can find out the OIDs you want to know by issuing the queries such as the following:
+PostgreSQL中的所有数据库对象都由相应的**对象标识符（OID）**在内部进行管理，这些对象标识符是无符号的4字节整数。数据库对象及其对应的OID，根据对象的类型，存储在恰当的 [系统目录](http://www.postgresql.org/docs/current/static/catalogs.html) 中。例如：数据库的和堆表的OID分别存储在*pg_database和pg_class*中，因此你可以通过发出像下面这样的查询来查找他们的OID：
 
 ```sql-monosp
 sampledb=# SELECT datname, oid FROM pg_database WHERE datname = 'sampledb';
@@ -35,54 +35,54 @@ sampledb=# SELECT relname, oid FROM pg_class WHERE relname = 'sampletbl';
 (1 row)
 ```
 
-## 1.2. Physical Structure of Database Cluster
+## 1.2. 数据库集簇的物理结构
 
-A *database cluster* basically is one directory referred to as **base directory**, and it contains some subdirectories and lots of files. If you execute the [initdb](http://www.postgresql.org/docs/current/static/app-initdb.html) utility to initialize a new database cluster, a base directory will be created under the specified directory. Though it is not compulsory, the path of the base directory is usually set to the environment variable *PGDATA*.
+一个*数据库集簇*本质上是一个目录，通常被称做**基础目录**，它包含一些子目录和许多文件。如果你执行[initdb](http://www.postgresql.org/docs/current/static/app-initdb.html)实用程序来初始化一个新的数据库集簇，则会在指定的目录下创建一个基础目录。虽然不是强制的，但基础目录的路径通常设置到环境变量*PGDATA*中。
 
-Figure 1.2 shows an example of database cluster in PostgreSQL. A database is a subdirectory under the *base* subdirectory, and each of the tables and indexes is (at least) one file stored under the subdirectory of the database to which it belongs. Also there are several subdirectories containing particular data, and configuration files. While PostgreSQL supports *tablespaces*, the meaning of the term is different from other RDBMS. A tablespace in PostgreSQL is one directory that contains some data outside of the base directory.
+图 1.2 展示了一个PostgreSQL中数据库集簇的示例。一个数据库是*base*子目录下的一个子目录，每个表和索引（至少）是一个存储在其所属数据库子目录下的文件。另外，还有几个包含特定数据和配置文件的子目录。尽管PostgreSQL支持*表空间*，但该术语的含义不同于其他RDBMS。PostgreSQL中表空间是一个目录，含有基础目录之外的一些数据。
 
-**Fig. 1.2. An example of database cluster.**
+**图 1.2. 一个数据库集簇的示例**
 
 ![Fig. 1.2. An example of database cluster.](http://www.interdb.jp/pg/img/fig-1-02.png)![img]()
 
-In the following subsections, the layout of a database cluster, databases, files associated with tables and indexes, and the tablespace in PostgreSQL are described.
+在下面几个小结中，将介绍PostgreSQL中的数据库集簇、数据库、与表和索引关联的数据库文件，以及表空间的布局。
 
-### 1.2.1. Layout of a Database Cluster
+### 1.2.1. 数据库集簇的布局
 
-The layout of database cluster has been described in the [official document](http://www.postgresql.org/docs/current/static/storage-file-layout.html). Main files and subdirectories in a part of the document have been listed in Table 1.1:
+数据库集簇的布局已经在 [官方文档](http://www.postgresql.org/docs/current/static/storage-file-layout.html)中进行了介绍。在 表1.1 中列出了文档中的部分主要文件和字目录:
 
-**table 1.1: Layout of files and subdirectories under the base directory (From the official document)**
+**表 1.1: 基础目录下的文件和子目录的布局  (摘自官方文档)**
 
 | files                             | description                                                  |
 | :-------------------------------- | :----------------------------------------------------------- |
-| PG_VERSION                        | A file containing the major version number of PostgreSQL     |
-| pg_hba.conf                       | A file to control PosgreSQL's client authentication          |
-| pg_ident.conf                     | A file to control PostgreSQL's user name mapping             |
-| postgresql.conf                   | A file to set configuration parameters                       |
-| postgresql.auto.conf              | A file used for storing configuration parameters that are set in ALTER SYSTEM (version 9.4 or later) |
-| postmaster.opts                   | A file recording the command line options the server was last started with |
+| PG_VERSION                        | 包含PostgreSQL主要版本号的文件                               |
+| pg_hba.conf                       | 用于控制PosgreSQL的客户端身份验证的文件                      |
+| pg_ident.conf                     | 用于控制PostgreSQL用户名映射的文件                           |
+| postgresql.conf                   | 用于设置参数的文件                                           |
+| postgresql.auto.conf              | 用于存储设置在 ALTER SYSTEM (版本 9.4 及更高版本)中的配置参数的文件 |
+| postmaster.opts                   | 记录服务器上次的启动的命令行选项的文件                       |
 | subdirectories                    | description                                                  |
-| base/                             | Subdirectory containing per-database subdirectories.         |
-| global/                           | Subdirectory containing cluster-wide tables, such as pg_database and pg_control. |
-| pg_commit_ts/                     | Subdirectory containing transaction commit timestamp data. Version 9.5 or later. |
-| pg_clog/ (Version 9.6 or earlier) | Subdirectory containing transaction commit state data. It is renamed to *pg_xact* in Version 10. CLOG will be described in [Section 5.4](http://www.interdb.jp/pg/pgsql05.html#_5.4.). |
-| pg_dynshmem/                      | Subdirectory containing files used by the dynamic shared memory subsystem. Version 9.4 or later. |
-| pg_logical/                       | Subdirectory containing status data for logical decoding. Version 9.4 or later. |
-| pg_multixact/                     | Subdirectory containing multitransaction status data (used for shared row locks) |
-| pg_notify/                        | Subdirectory containing LISTEN/NOTIFY status data            |
-| pg_repslot/                       | Subdirectory containing [replication slot](http://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS) data. Version 9.4 or later. |
-| pg_serial/                        | Subdirectory containing information about committed serializable transactions (version 9.1 or later) |
-| pg_snapshots/                     | Subdirectory containing exported snapshots (version 9.2 or later). The PostgreSQL's function pg_export_snapshot creates a snapshot information file in this subdirectory. |
-| pg_stat/                          | Subdirectory containing permanent files for the statistics subsystem. |
-| pg_stat_tmp/                      | Subdirectory containing temporary files for the statistics subsystem. |
-| pg_subtrans/                      | Subdirectory containing subtransaction status data           |
-| pg_tblspc/                        | Subdirectory containing symbolic links to tablespaces        |
+| base/                             | 包含每个数据库子目录的子目录。                               |
+| global/                           | Subdirectory 包含集簇范围的的表，如pg_database 和 pg_control的子目录。 |
+| pg_commit_ts/                     | 包含事务提交时间戳数据的子目录。版本9.5及更高版本。          |
+| pg_clog/ (Version 9.6 or earlier) | 包含事物提交状态数据的子目录. 它在版本10中被重命名为 *pg_xact* 。 CLOG 将在 [小节5.4](http://www.interdb.jp/pg/pgsql05.html#_5.4.)中介绍。 |
+| pg_dynshmem/                      | 包含动态共享内存子系统使用的文件的子目录。版本9.4及更高版本。 |
+| pg_logical/                       | 包含用于逻辑解码的状态数据的子目录。版本 9.4 及更高版本。    |
+| pg_multixact/                     | 包含多重事务状态数据的子目录（用于共享行锁）                 |
+| pg_notify/                        | 包含 LISTEN/NOTIFY 状态数据的子目录。                        |
+| pg_repslot/                       | 包含 [复制插槽](http://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS) 数据的子目录。版本 9.4 及更高版本。 |
+| pg_serial/                        | 包含有关已提交的序列化事务的信息的子目录。 (版本 9.1及更高版本) |
+| pg_snapshots/                     | 包含导出的快照的子目录 (版本 9.2 及更高版本)。PostgreSQL的函数pg_export_snapshot在此子目录中创建一个快照信息文件。 |
+| pg_stat/                          | 包含统计子系统的永久文件的子目录。                           |
+| pg_stat_tmp/                      | 包含统计子系统的临时文件的子目录。                           |
+| pg_subtrans/                      | 包含子事务状态信息的子目录。                                 |
+| pg_tblspc/                        | 包含指向表空间的符号链接的子目录。                           |
 | pg_twophase/                      | Subdirectory containing state files for prepared transactions |
-| pg_wal/ (Version 10 or later)     | Subdirectory containing WAL (Write Ahead Logging) segment files. It is renamed from *pg_xlog* in Version 10. |
-| pg_xact/ (Version 10 or later)    | Subdirectory containing transaction commit state data. It is renamed from *pg_clog* in Version 10. CLOG will be described in [Section 5.4](http://www.interdb.jp/pg/pgsql05.html#_5.4.). |
-| pg_xlog/ (Version 9.6 or earlier) | Subdirectory containing WAL (Write Ahead Logging) segment files. It is renamed to *pg_wal* in Version 10. |
+| pg_wal/ (Version 10 or later)     | 包含WAL（预写日志）段文件的子目录。在版本10中从原先的* pg_xlog *重命名而来。 |
+| pg_xact/ (Version 10 or later)    | 包含事物提交状态数据的子目录。从版本10的*pg_clog* 重命名而来。CLOG 将在 [小结 5.4](http://www.interdb.jp/pg/pgsql05.html#_5.4.)进行介绍。 |
+| pg_xlog/ (Version 9.6 or earlier) | 包含WAL（预写日志）段文件的子目录。在版本10中将其重命名为* pg_wal *。 |
 
-### 1.2.2. Layout of Databases
+### 1.2.2. 数据库的布局
 
 A database is a subdirectory under the *base* subdirectory; and the database directory names are identical to the respective OIDs. For example, when the OID of the database *sampledb* is 16384, its subdirectory name is 16384.
 
@@ -171,7 +171,7 @@ $ ls -la base/16384/18751*
 
 They may also be internally referred to as the **forks** of each relation; the free space map is the first fork of the table/index data file (the fork number is 1), the visibility map the second fork of the table's data file (the fork number is 2). The fork number of the data file is 0.
 
-### 1.2.4. Tablespaces
+### 1.2.4. 表空间
 
 A *tablespace* in PostgreSQL is an additional data area outside the base directory. This function has been implemented in version 8.0.
 
