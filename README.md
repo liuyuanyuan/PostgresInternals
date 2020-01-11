@@ -30,6 +30,8 @@
 
 <img src="guid_map.png" align="left"/>
 
+
+
 ## 变更历史
 自2018年6月3日以来的变更历史记录如下：
 
