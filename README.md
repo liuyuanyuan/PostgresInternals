@@ -1,4 +1,4 @@
-<img src="http://www.interdb.jp/pg/img/puestas-fauna-mecanica-c.png" align="center"/>
+<img src="http://www.interdb.jp/pg/img/puestas-fauna-mecanica-c.png" align="right"/>
 
 # PostgreSQL 内部机制
 适用于PostgreSQL数据库管理员和系统开发人员
