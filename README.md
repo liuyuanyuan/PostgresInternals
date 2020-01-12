@@ -1,6 +1,6 @@
 <img src="http://www.interdb.jp/pg/img/puestas-fauna-mecanica-c.png" align="right"/>
 
-# PostgreSQL 内部机制
+# PostgreSQL 内部剖析
 适用于PostgreSQL数据库管理员和系统开发人员
 > :elephant: 本文翻译自 [Hironobu SUZUKI](http://www.interdb.jp/) 的经典系列博文 [The Internals of PostgreSQL](http://www.interdb.jp/pg/) 。
 

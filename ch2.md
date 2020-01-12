@@ -1,64 +1,64 @@
-# Chapter 2  Process and Memory Architecture
+# 2  进程和内存架构
 
-In this chapter, the process architecture and memory architecture in PostgreSQL are summarized to help to read the subsequent chapters. If you are already familiar with them, you may skip over this chapter.
+在本章中，对PostgreSQL中的进程架构和内存体系结构进行了总结，以帮助阅读后续章节。如果您已经熟悉这些内容，则可以跳过本章。
 
-## 2.1. Process Architecture
+## 2.1. 进程架构
 
-PostgreSQL is a client/server type relational database management system with the multi-process architecture and runs on a single host.
+PostgreSQL是一个客户端/服务器类型的关系型数据库管理系统，具有多进程架构并且可在单机上运行。
 
-A collection of multiple processes cooperatively managing one database cluster is usually referred to as a *'PostgreSQL server'*, and it contains the following types of processes:
+协同管理一个数据库集簇的多个进程的集合，通常称作一个*'PostgreSQL 服务'*，它包含以下类型的进程：
 
-- A **postgres server process** is a parent of all processes related to a database cluster management.
-- Each **backend process** handles all queries and statements issued by a connected client.
-- Various **background processes** perform processes of each feature (e.g., VACUUM and CHECKPOINT processes) for database management.
-- In the **replication associated processes**, they perform the streaming replication. The details are described in [Chapter 11](http://www.interdb.jp/pg/pgsql11.html).
-- In the **background worker process** supported from version 9.3, it can perform any processing implemented by users. As not going into detail here, refer to the [official document](http://www.postgresql.org/docs/current/static/bgworker.html).
+- **postgres server process** 是与数据库集群管理相关的所有进程的父进程。
+- 每个 **backend process** 处理由连接的客户端发出的所有查询和语句。
+- 各种 **background processes** 执行各自功能的进程 (例如：VACUUM 和 CHECKPOINT 进程) 以进行数据库管理。
+- 在 **replication associated processes** 中，他们执行流复制。 详细内容在 [第11章](http://www.interdb.jp/pg/pgsql11.html)进行介绍。
+- 在自版本9.3开始支持的 **background worker process** 中，它可以执行用户实现的任何处理。此处不再赘述，请参考 [官方文档](http://www.postgresql.org/docs/current/static/bgworker.html)。
 
-In the following subsections, the details of the first three types of processes are described.
+在以下小节中，将详细介绍前三种类型的进程。
 
-**Fig. 2.1. An example of the process architecture in PostgreSQL.**
+**图 2.1. PostgreSQL中进程架构的示例**
 
 ![Fig. 2.1. An example of the process architecture in PostgreSQL.](http://www.interdb.jp/pg/img/fig-2-01.png)![img]()
 
 ------
 
-This figure shows processes of a PostgreSQL server: a postgres server process, two backend processes, seven background processes, and two client processes. The database cluster, the shared memory, and two client processes are also illustrated.
+该图展示了一个PostgreSQL服务的所有进程：1个postgres server进程，2个backend processes，7个background processes和2个client processes。还展示了database cluster、shared memory和2个client processes 。
 
 ### 2.1.1. Postgres Server Process
 
-As already described above, a *postgres server process* is a parent of all in a PostgreSQL server. In the earlier versions, it was called ‘postmaster’.
+如上所述，*postgres server process*是PostgreSQL服务中所有进程的父进程。在早期版本中，它被称为 ‘postmaster’。
 
-By executing the [pg_ctl](http://www.postgresql.org/docs/current/static/app-pg-ctl.html) utility with *start* option, a postgres server process starts up. Then, it allocates a shared memory area in memory, starts various background processes, starts replication associated processes and background worker processes if necessary, and waits for connection requests from clients. Whenever receiving a connection request from a client, it starts a backend process. (And then, the started backend process handles all queries issued by the connected client.)
+通过执行[pg_ctl](http://www.postgresql.org/docs/current/static/app-pg-ctl.html) 实用程序的*start* 选项, 会启动一个 postgres server process。然后，它在内存中分配一个共享内存区域，启动各种后台进程，必要时启动eplication associated processes和background worker processes，并等待来自客户端的连接请求。每当接收到来自客户端的连接请求时，它就会启动一个backend process。 （然后，启动的backend process处理由连接的客户端发出的所有查询。）
 
-A postgres server process listens to one network port, the default port is 5432. Although more than one PostgreSQL server can be run on the same host, each server should be set to listen to different port number in each other, e.g., 5432, 5433, etc.
+一个 postgres server process 监听一个网络端口，默认端口号是5432。虽然可以在同一主机上运行多个PostgreSQL server，但应该将每个服务器设置为监听不同的端口号，例如5432、5433等。
 
 ### 2.1.2. Backend Processes
 
-A backend process, which is also called *postgres*, is started by the postgres server process and handles all queries issued by one connected client. It communicates with the client by a single TCP connection, and terminates when the client gets disconnected.
+一个 backend process，也被称作 *postgres*，由 postgres server process 启动，并处理由一个连接的客户端发出的所有查询。它通过单个TCP连接与客户端通信，并在客户端断开连接时终止。
 
-As it is allowed to operate only one database, you have to specify a database you want to use explicitly when connecting to a PostgreSQL server.
+由于一次只允许操作一个数据库，因此当连接一个PostgreSQL server时需要显式地指定一个要使用的数据库。
 
-PostgreSQL allows multiple clients to connect simultaneously; the configuration parameter *[max_connections](http://www.postgresql.org/docs/current/static/runtime-config-connection.html#GUC-MAX-CONNECTIONS)* controls the maximum number of the clients (default is 100).
+PostgreSQL 允许多个客户端同时连接；配置参数 *[max_connections](http://www.postgresql.org/docs/current/static/runtime-config-connection.html#GUC-MAX-CONNECTIONS)* 控制客户端的最大数量 (默认为100)。
 
-If many clients such as WEB applications frequently repeat the connection and disconnection with a PostgreSQL server, it increases both costs of establishing connections and of creating backend processes because PostgreSQL has not implemented a native connection pooling feature. Such circumstance has a negative effect on the performance of database server. To deal with such a case, a pooling middleware (either [pgbouncer](https://pgbouncer.github.io/) or [pgpool-II](http://www.pgpool.net/mediawiki/index.php/Main_Page)) is usually used.
+如果许多客户端（例如WEB应用程序）经常与PostgreSQL server进行重复连接和断开连接，则这会增加建立连接和创建backend processes的成本，因为PostgreSQL尚未实现本机连接池功能。这种情况会对数据库服务器的性能产生负面影响。为了解决这种情况 ，通常实用池化中间件 ( [pgbouncer](https://pgbouncer.github.io/) 或者 [pgpool-II](http://www.pgpool.net/mediawiki/index.php/Main_Page)) 。
 
 ### 2.1.3. Background Processes
 
-Table 2.1 shows a list of background processes. In contrast to the postgres server and the backend process, it is impossible to explain each of the functions simply, because these functions depend on the individual specific features and PostgreSQL internals. Thus, in this chapter, only introductions are made. Details will be described in the following chapters.
+表 2.1 展示了 background processes 的列表。与 postgres server 和 backend process相比，不可能简单地解释每个功能，因为这些功能依赖于独立的指定功能和PostgreSQL内部机制。因此，本章仅作介绍。详细内容将在以下一章中介绍。
+
+**表 2.1: background processes.**
 
 | process                    | description                                                  | reference                                                    |
 | :------------------------- | :----------------------------------------------------------- | :----------------------------------------------------------- |
-| background writer          | In this process, dirty pages on the shared buffer pool are written to a persistent storage (e.g., HDD, SSD) on a regular basis gradually. (In version 9.1 or earlier, it was also responsible for checkpoint process.) | [Section 8.6](http://www.interdb.jp/pg/pgsql08.html#_8.6.)   |
-| checkpointer               | In this process in version 9.2 or later, checkpoint process is performed. | [Section 8.6](http://www.interdb.jp/pg/pgsql08.html#_8.6.), [Section 9.7](http://www.interdb.jp/pg/pgsql09.html#_9.7.) |
-| autovacuum launcher        | The autovacuum-worker processes are invoked for vacuum process periodically. (More precisely, it requests to create the autovacuum workers to the postgres server.) | [Section 6.5](http://www.interdb.jp/pg/pgsql06.html#_6.5.)   |
-| WAL writer                 | This process writes and flushes periodically the WAL data on the WAL buffer to persistent storage. | [Section 9.9](http://www.interdb.jp/pg/pgsql09.html#_9.9.)   |
-| statistics collector       | In this process, statistics information such as for pg_stat_activity and for pg_stat_database, etc. is collected. |                                                              |
-| logging collector (logger) | This process writes error messages into log files.           |                                                              |
-| archiver                   | In this process, archiving logging is executed.              | [Section 9.10](http://www.interdb.jp/pg/pgsql09.html#_9.10.) |
+| background writer          | 在该进程中，共享缓冲池上的脏页会定期有规律地逐渐写入持久性存储（例如HDD，SSD）。 （在9.1或更早版本中，它还负责检查点进程。） | [小节 8.6](http://www.interdb.jp/pg/pgsql08.html#_8.6.)      |
+| checkpointer               | 在9.2或更高版本中，在该进程中执行检查点进程。                | [小节 8.6](http://www.interdb.jp/pg/pgsql08.html#_8.6.), [小节 9.7](http://www.interdb.jp/pg/pgsql09.html#_9.7.) |
+| autovacuum launcher        | autovacuum-worker processes 会被定期触发用于vacuum process 。 (更确切的说，它请求为 postgres server 创建 autovacuum workers 。) | [小节 6.5](http://www.interdb.jp/pg/pgsql06.html#_6.5.)      |
+| WAL writer                 | 该进程定期将WAL缓冲区上的WAL数据写入并刷到持久性存储中。     | [小节 9.9](http://www.interdb.jp/pg/pgsql09.html#_9.9.)      |
+| statistics collector       | 在该进程中，将为诸如 pg_stat_activity 和pg_stat_database 收集统计信息。 |                                                              |
+| logging collector (logger) | 该进程将错误信息写入日志文件。                               |                                                              |
+| archiver                   | 该进程中执行归档日志记录归档 。                              | [小节 9.10](http://www.interdb.jp/pg/pgsql09.html#_9.10.)    |
 
-
-
-The actual processes of a PostgreSQL server is shown here. In the following example, one postgres server process (pid is 9687), two backend processes (pids are 9697 and 9717) and the several background processes listed in Table 2.1 are running. See also Fig. 2.1.
+> 此处展示了一个PostgreSQL server的实际进程情况。在下面的示例中，1个 postgres server process（pid为9687），2个backend processes（pid为9697和9717）以及 表2.1 中列出的几个background processes正在运行。另请参阅 图2.1。
 
 ```
 postgres> pstree -p 9687
@@ -77,43 +77,43 @@ postgres> pstree -p 9687
 
 
 
-## 2.2. Memory Architecture
+## 2.2. 内存架构
 
-Memory architecture in PostgreSQL can be classified into two broad categories:
+ PostgreSQL 中的内存架构可以分为两大类：
 
-- Local memory area – allocated by each backend process for its own use.
-- Shared memory area – used by all processes of a PostgreSQL server.
+- 本地内存区 – 由每个 backend process 自己分配以供其自己使用。
+- 共享内存区域 – 由PostgreSQL server的所有进程使用。
 
-In the following subsections, those are briefly descibed.
+在以下小节中，将简要介绍这些内容。
 
-**Fig. 2.2. Memory architecture in PostgreSQL.**
+**图 2.2.  PostgreSQL中的内存架构**
 
 ![Fig. 2.2. Memory architecture in PostgreSQL.](http://www.interdb.jp/pg/img/fig-2-02.png)![img]()
 
-### 2.2.1. Local Memory Area
+### 2.2.1. 本地内存区域
 
-Each backend process allocates a local memory area for query processing; each area is divided into several sub-areas – whose sizes are either fixed or variable. Table 2.2 shows a list of the major sub-areas. The details will be described in the following chapters.
+每个backend process分配一个本地内存区用于查询处理；每个区域都分为几个子区域 - 它们的大小可以是固定的也可以是可变的。表2.2列出了主要的子区域。详细内容将在以下章节中介绍。
 
-| sub-area             | description                                                  | reference                                                  |
-| :------------------- | :----------------------------------------------------------- | :--------------------------------------------------------- |
-| work_mem             | Executor uses this area for sorting tuples by ORDER BY and DISTINCT operations, and for joining tables by merge-join and hash-join operations. | [Chapter 3](http://www.interdb.jp/pg/pgsql03.html)         |
-| maintenance_work_mem | Some kinds of maintenance operations (e.g., VACUUM, REINDEX) use this area. | [Section 6.1](http://www.interdb.jp/pg/pgsql06.html#_6.1.) |
-| temp_buffers         | Executor uses this area for storing temporary tables.        |                                                            |
+| sub-area             | description                                                  | reference                                               |
+| :------------------- | :----------------------------------------------------------- | :------------------------------------------------------ |
+| work_mem             | 执行器使用此区域：通过ORDER BY和DISTINCT操作对元组进行排序，并通过merge-join和hash-join操作进行表连接。 | [第 3 章](http://www.interdb.jp/pg/pgsql03.html)        |
+| maintenance_work_mem | 某些维护操作 (如： VACUUM、 REINDEX) 使用该区域。            | [小节 6.1](http://www.interdb.jp/pg/pgsql06.html#_6.1.) |
+| temp_buffers         | Executor uses this area for storing temporary tables.        |                                                         |
 
-### 2.2.2. Shared Memory Area
+### 2.2.2. 共享内存区域
 
-A shared memory area is allocated by a PostgreSQL server when it starts up. This area is also divided into several fix sized sub-areas. Table 2.3 shows a list of the major sub-areas. The details will be described in the following chapters.
+PostgreSQL服务器启动时将分配一个共享内存区域。此区域也分为几个固定大小的子区域。表 2.3 列出了主要子区域。详细内容将在以下章节中介绍。
 
-| sub-area           | description                                                  | reference                                                  |
-| :----------------- | :----------------------------------------------------------- | :--------------------------------------------------------- |
-| shared buffer pool | PostgreSQL loads pages within tables and indexes from a persistent storage to here, and operates them directly. | [Chapter 8](http://www.interdb.jp/pg/pgsql08.html)         |
-| WAL buffer         | To ensure that no data has been lost by server failures, PostgreSQL supports the WAL mechanism. WAL data (also referred to as XLOG records) are transaction log in PostgreSQL; and WAL buffer is a buffering area of the WAL data before writing to a persistent storage. | [Chapter 9](http://www.interdb.jp/pg/pgsql09.html)         |
-| commit log         | Commit Log(CLOG) keeps the states of all transactions (e.g., in_progress,committed,aborted) for Concurrency Control (CC) mechanism. | [Section 5.4](http://www.interdb.jp/pg/pgsql05.html#_5.4.) |
+| sub-area           | description                                                  | reference                                               |
+| :----------------- | :----------------------------------------------------------- | :------------------------------------------------------ |
+| shared buffer pool | PostgreSQL将表和索引中的页从持久性存储加载到此处，并直接对其进行操作。 | [第 8 章](http://www.interdb.jp/pg/pgsql08.html)        |
+| WAL buffer         | 为了确保服务器故障不会丢失任何数据，PostgreSQL支持WAL机制。 WAL数据（也称为XLOG记录）是PostgreSQL中的事务日志； WAL缓冲区是WAL数据在写入持久性存储之前的缓冲区。 | [第 9 章](http://www.interdb.jp/pg/pgsql09.html)        |
+| commit log         | Commit Log(CLOG) 保持所有事务的状态 (例如：in_progress、committed、aborted) 用于 Concurrency Control (CC) 机制。 | [小节 5.4](http://www.interdb.jp/pg/pgsql05.html#_5.4.) |
 
-In addition to them, PostgreSQL allocates several areas as shown below:
+除了这些，PostgreSQL还分配了几个区域，比如下面的：
 
-- Sub-areas for the various access control mechanisms. (e.g., semaphores, lightweight locks, shared and exclusive locks, etc)
-- Sub-areas for the various background processes, such as checkpointer and autovacuum.
-- Sub-areas for transaction processing such as save-point and two-phase-commit.
+- 用于各种访问控制机制的子区域。(例如：semaphores, lightweight locks, shared 和 exclusive locks等)
+- 用于各种background processes的子区域，例如checkpointer 和 autovacuum。
+- 用于事务处理的子区域，例如保存点（save-point ）和两阶段提交（ two-phase-commit）。
 
-and others.
+以及其他的区域。
