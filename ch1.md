@@ -1,4 +1,4 @@
-# 第1章 数据库集簇，数据库和表
+# 1 数据库集簇，数据库和表
 
 本章以及下一章总结了 PostgreSQL 基础知识，以帮助阅读后续的章节。本章主要介绍以下主题：
 
@@ -84,7 +84,7 @@ sampledb=# SELECT relname, oid FROM pg_class WHERE relname = 'sampletbl';
 
 ### 1.2.2. 数据库的布局
 
-A database is a subdirectory under the *base* subdirectory; and the database directory names are identical to the respective OIDs. For example, when the OID of the database *sampledb* is 16384, its subdirectory name is 16384.
+一个数据库是*base*子目录下的一个子目录；数据库目录的名字与其OID相同。例如，当数据库*sampledb的 OID是16384，那么它的子目录名称是16384。
 
 ```
 $ cd $PGDATA
@@ -92,11 +92,11 @@ $ ls -ld base/16384
 drwx------  213 postgres postgres  7242  8 26 16:33 16384
 ```
 
-### 1.2.3. Layout of Files Associated with Tables and Indexes
+### 1.2.3. 与表和索引关联的文件的布局
 
-Each table or index whose size is less than 1GB is a single file stored under the database directory it belongs to. Tables and indexes as database objects are internally managed by individual OIDs, while those data files are managed by the variable, *relfilenode*. The relfilenode values of tables and indexes basically but **not** always match the respective OIDs, the details are described below.
+每个小于1GB的表或索引都是一个独立的文件，存储在其所属数据库的目录下。表和索引作为数据库对象在内部通过独立的OID管理，而这些数据文件由变量*relfilenode*管理。表和索引的relfilenode值，基本上但并不总是匹配各自的OID，详细说明如下。
 
-Let's show the OID and relfilenode of the table *sampletbl*:
+让我们查看一下表*sampletbl* 的OID和relfilenode：
 
 ```sql-monosp
 sampledb=# SELECT relname, oid, relfilenode FROM pg_class WHERE relname = 'sampletbl';
@@ -106,7 +106,7 @@ sampledb=# SELECT relname, oid, relfilenode FROM pg_class WHERE relname = 'sampl
 (1 row)
 ```
 
-From the result above, you can see that both oid and relfilenode values are equal. You can also see that the data file path of the table *sampletbl* is *'base/16384/18740'*.
+从上面的结果，你可以看到oid和relfilenode的值是相等的。你还可以看到表*sampletbl*的数据文件的路径是*'base/16384/18740'*。
 
 ```
 $ cd $PGDATA
@@ -114,7 +114,7 @@ $ ls -la base/16384/18740
 -rw------- 1 postgres postgres 8192 Apr 21 10:21 base/16384/18740
 ```
 
-The relfilenode values of tables and indexes are changed by issuing some commands (e.g., TRUNCATE, REINDEX, CLUSTER). For example, if we truncate the table *sampletbl*, PostgreSQL assigns a new relfilenode (18812) to the table, removes the old data file (18740), and creates a new one (18812).
+表和索引的relfilenode值可以通过发出一些命令（例如：TRUNCATE，REINDEX，CLUSTER）进行更改。例如，如果我们截断表*sampletbl*，PostgreSQL将为该表分配一个新的relfilenode（18812），删除旧的数据文件（18740），并创建一个新的relfilenode（18812）。
 
 ```sql-monosp
 sampledb=# TRUNCATE sampletbl;
@@ -127,9 +127,7 @@ sampledb=# SELECT relname, oid, relfilenode FROM pg_class WHERE relname = 'sampl
 (1 row)
 ```
 
-
-
-In version 9.0 or later, the built-in function *pg_relation_filepath* is useful as this function returns the file path name of the relation with the specified OID or name.
+在9.0或更高版本中，内置函数 *pg_relation_filepath* 是很有用的，因为该函数通过指定的OID或名称，返回该关系的文件路径名。
 
 ```sql-monosp
 sampledb=# SELECT pg_relation_filepath('sampletbl');
@@ -139,9 +137,7 @@ sampledb=# SELECT pg_relation_filepath('sampletbl');
 (1 row)
 ```
 
-
-
-When the file size of tables and indexes exceeds 1GB, PostgreSQL creates a new file named like relfilenode.1 and uses it. If the new file has been filled up, next new file named like relfilenode.2 will be created, and so on.
+当表和索引的文件大小超过1GB时，PostgreSQL将创建一个名为relfilenode.1的新文件并使用它。如果新文件已填满，将创建下一个名为relfilenode.2的新文件，依此类推。
 
 ```
 $ cd $PGDATA
@@ -151,15 +147,11 @@ $ ls -la -h base/16384/19427*
 ...
 ```
 
+在构建PostgreSQL时，可以使用配置选项--with-segsize更改表和索引的最大文件大小。
 
+仔细查看数据库子目录，您会发现每个表都有两个关联文件，分别以“ *fsm*”和“ *vm*”为后缀。它们分别称为**free space map** 和 **visibility map**，分别在表文件中的每一页上存储可用空间容量和可见性的信息 (请参阅 [小节 5.3.4](http://www.interdb.jp/pg/pgsql05.html#5.3.4.) 和 [小节 6.2](http://www.interdb.jp/pg/pgsql06.html#_6.2.) 获取更多详细信息）。索引仅具有单独的free space maps，而没有visibility map。
 
-The maximum file size of tables and indexes can be changed using the configuration, option --with-segsize when building PostgreSQL.
-
-
-
-Looking carefully at the database subdirectories, you will find out that each table has two associated files suffixed respectively with '_fsm' and '_vm'. Those are referred to as **free space map** and **visibility map**, storing the information of the free space capacity and the visibility on each page within the table file, respectively (see more detail in [Section 5.3.4](http://www.interdb.jp/pg/pgsql05.html#_5.3.4.) and [Section 6.2](http://www.interdb.jp/pg/pgsql06.html#_6.2.)). Indexes only have individual free space maps and don't have visibility map.
-
-A specific example is shown below:
+一个具体示例如下：
 
 ```
 $ cd $PGDATA
@@ -169,26 +161,26 @@ $ ls -la base/16384/18751*
 -rw------- 1 postgres postgres  8192 Apr 21 10:18 base/16384/18751_vm
 ```
 
-They may also be internally referred to as the **forks** of each relation; the free space map is the first fork of the table/index data file (the fork number is 1), the visibility map the second fork of the table's data file (the fork number is 2). The fork number of the data file is 0.
+它们在内部也可以称为每个关系的**forks**；free space map是表/索引数据文件的第一个fork（fork编号为1），visibility map是表的数据文件的第二个fork（fork编号为2）。数据文件的fork编号为0。
 
 ### 1.2.4. 表空间
 
-A *tablespace* in PostgreSQL is an additional data area outside the base directory. This function has been implemented in version 8.0.
+PostgreSQL中的*tablespace*是基础目录之外的额外数据区域。此功能已在8.0版中实现。
 
-Figure 1.3 shows the internal layout of a tablespace, and the relationship with the main data area.
+图1.3 显示了一个表空间的内部布局，以及与主数据区域的关系。
 
-**Fig. 1.3. A Tablespace in the Database Cluster.**
+**图 1.3. 数据库集簇中的一个表空间
 
 ![Fig. 1.3. A Tablespace in the Database Cluster.](http://www.interdb.jp/pg/img/fig-1-03.png)
 ![img]()
 
-A tablespace is created under the directory specified when you issue [CREATE TABLESPACE](http://www.postgresql.org/docs/current/static/sql-createtablespace.html) statement, and under that directory, the version-specific subdirectory (e.g., PG_9.4_201409291) will be created. The naming method for version-specific one is shown below.
+一个表空间创建的位置是在发出 [CREATE TABLESPACE](http://www.postgresql.org/docs/current/static/sql-createtablespace.html) 语句时指定的路径。并且，在那个路径下，特定版本的子路径 (例如： PG_9.4_201409291) 会被创建。 特定版本的子目录的命名方法如下所示。
 
 ```
 PG _ 'Major version' _ 'Catalogue version number'
 ```
 
-For example, if you create a tablespace *'new_tblspc'* at *'/home/postgres/tblspc'*, whose oid is 16386, a subdirectory such as *'PG_9.4_201409291'* would be created under the tablespace.
+例如， 如果你在 *'/home/postgres/tblspc'* 创建一个表空间 *'new_tblspc'* ，其oid为16386， 则会在该表空间下创建一个子目录，例如*'PG_9.4_201409291'*。
 
 ```
 $ ls -l /home/postgres/tblspc/
@@ -196,7 +188,7 @@ total 4
 drwx------ 2 postgres postgres 4096 Apr 21 10:08 PG_9.4_201409291
 ```
 
-The tablespace directory is addressed by a symbolic link from the *pg_tblspc* subdirectory, and the link name is the same as the OID value of tablespace.
+该表空间目录由来自*pg_tblspc*子目录的符号链接来寻址，且链接名称与表空间的OID值相同。
 
 ```
 $ ls -l $PGDATA/pg_tblspc/
@@ -204,7 +196,7 @@ total 0
 lrwxrwxrwx 1 postgres postgres 21 Apr 21 10:08 16386 -> /home/postgres/tblspc
 ```
 
-If you create a new database (OID is 16387) under the tablespace, its directory is created under the version-specific subdirectory.
+如果你在tablespace下创建了一个新的数据库 (OID 为 16387) ，那么它的目录会被创建在特定版本子目录下。 
 
 ```
 $ ls -l /home/postgres/tblspc/PG_9.4_201409291/
@@ -212,7 +204,7 @@ total 4
 drwx------ 2 postgres postgres 4096 Apr 21 10:10 16387
 ```
 
-If you create a new table which belongs to the database created under the base directory, first, the new directory, whose name is the same as the existing database OID, is created under the version specific subdirectory, and then the new table file is placed under the created directory.
+如果你创建一个新的表，该表所属于在base目录下创建的数据库：首先，新目录的名称与现有数据库OID相同，创建到特定版本子目录下；然后，将新的表文件放入创建的目录下。 
 
 ```sql-monosp
 sampledb=# CREATE TABLE newtbl (.....) TABLESPACE new_tblspc;
@@ -223,72 +215,66 @@ sampledb=# SELECT pg_relation_filepath('newtbl');
  pg_tblspc/16386/PG_9.4_201409291/16384/18894
 ```
 
-## 1.3. Internal Layout of a Heap Table File
+## 1.3. 一个堆表文件的内部布局
 
-Inside the data file (heap table and index, as well as the free space map and visibility map), it is divided into **pages** (or **blocks**) of fixed length, the default is 8192 byte (8 KB). Those pages within each file are numbered sequentially from 0, and such numbers are called as **block numbers**. If the file has been filled up, PostgreSQL adds a new empty page to the end of the file to increase the file size.
+在数据文件（堆表和索引，以及free space map和visibility map）内部，该文件分为固定长度的**页（pages）**（或**块（blocks）**），默认为8192字节（8 KB）。每个文件中的那些页面从0开始按顺序编号，这些编号称为**块编号（**block numbers）**。如果文件已填满，PostgreSQL将在文件末尾添加一个新的空白页以增加文件大小。
 
-Internal layout of pages depends on the data file types. In this section, the table layout is described as the information will be required in the following chapters.
+页的内部布局取决于数据文件的类型。在本小节中，将介绍表的布局，因为后边章节将需要这些信息。
 
-**Fig. 1.4. Page layout of a heap table file.**
+**图 1.4. 一个堆表文件的页的布局**
 
 ![Fig. 1.4. Page layout of a heap table file.](http://www.interdb.jp/pg/img/fig-1-04.png)![img]()
 
-A page within a table contains three kinds of data described as follows:
+一个表中的一个页包含三种数据，描述如下:
 
-1. **heap tuple(s)** – A heap tuple is a record data itself. They are stacked in order from the bottom of the page. The internal structure of tuple is described in [Section 5.2](http://www.interdb.jp/pg/pgsql05.html#_5.2.) and [Chapter 9](http://www.interdb.jp/pg/pgsql09.html) as the knowledge of both Concurrency Control(CC) and WAL in PostgreSQL are required.
+1. **堆元组heap tuple(s)** – 堆元组本身就是记录数据。它们从页面底部开始按顺序堆叠。元组的内部结构在 [小节 5.2](http://www.interdb.jp/pg/pgsql05.html#_5.2.) and [第 9 章](http://www.interdb.jp/pg/pgsql09.html) 介绍，同时需要了解PostgreSQL中的并发控制(CC) 和 WAL的知识。
 
-2. **line pointer(s)** – A line pointer is 4 byte long and holds a pointer to each heap tuple. It is also called an **item pointer**.
-   Line pointers form a simple array, which plays the role of index to the tuples. Each index is numbered sequentially from 1, and called **offset number**. When a new tuple is added to the page, a new line pointer is also pushed onto the array to point to the new one.
+2. **行指针line pointer(s)** – 一个行指针的长度为4字节，并包含指向每个堆元组的指针。它也被称为**项指针（item pointer）**.
+   多个行指针组成一个简单的数组，该数组起着元组的索引的作用。每个索引从1开始依次编号，称为**偏移量（offset number） **。当将1个新的元组添加到页时，一个新的行指针也被推到数组上以指向新的元组。
 
-3. **header data** – A header data defined by the structure [PageHeaderData](javascript:void(0)) is allocated in the beginning of the page. It is 24 byte long and contains general information about the page. The major variables of the structure are described below.
+3. **头数据header data** – 由[PageHeaderData](javascript:void(0)) 定义的头数据位于页的开头。它的长度是24字节，包含有关于页的常规信息。结构的主要变量描述如下。
 
-4. - *pd_lsn* – This variable stores the LSN of XLOG record written by the last change of this page. It is an 8-byte unsigned integer, related to the WAL (Write-Ahead Logging) mechanism. The details are described in [Chapter 9](http://www.interdb.jp/pg/pgsql09.html#_9.1.2.).
-   - *pd_checksum* – This variable stores the checksum value of this page. (Note that this variable is supported in version 9.3 or later; in earlier versions, this part had stored the timelineId of the page.)
-   - *pd_lower, pd_upper* – pd_lower points to the end of line pointers, and pd_upper to the beginning of the newest heap tuple.
-   - *pd_special* – This variable is for indexes. In the page within tables, it points to the end of the page. (In the page within indexes, it points to the beginning of special space which is the data area held only by indexes and contains the particular data according to the kind of index types such as B-tree, GiST, GiN, etc.)
+4. - *pd_lsn* – 该变量存储由该页面的最后更改写入的XLOG记录的LSN 。它是一个8字节无符号整型，与 WAL (Write-Ahead Logging) 机制有关。详情在 [第 9 章](http://www.interdb.jp/pg/pgsql09.html#_9.1.2.)进行介绍。
+   - *pd_checksum* – 该变量存储该页的校验和值（checksum value）。（请注意，此变量仅在版本9.3或更高版本中支持；在较早的版本中，此部分已经存储了页的timelineId。）
+   - *pd_lower, pd_upper* – pd_lower指向行指针的末尾，而pd_upper指向最新堆元组的开头。 
+   - *pd_special* – 此变量用于索引。在表的页中，它指向页面的末尾。 （在索引的页中，它指向特殊空间的开头，该空间是仅由索引保存的数据区域，并根据诸如B树，GiST，GiN等类型的索引类型包含特定数据。）
 
-An empty space between the end of line pointers and the beginning of the newest tuple is referred to as **free space** or **hole**.
+行指针的末尾和最新元组的开头之间的空白空间被称作 **free space** 或者 **hole**.
 
-To identify a tuple within the table, **tuple identifier (TID)** is internally used. A TID comprises a pair of values: the *block number* of the page that contains the tuple, and the *offset number* of the line pointer that points to the tuple. A typical example of its usage is index. See more detail in [Section 1.4.2](http://www.interdb.jp/pg/pgsql01.html#_1.4.2.).
+为了标识表中的元组，内部使用了**元组标识符（TID）**。 一个TID包含一对值：包含元组的页的*块号block number*和指向元组的行指针的*偏移量（offset number）*。其用法的一个典型例子是索引。详情参见 [小结 1.4.2](http://www.interdb.jp/pg/pgsql01.html#_1.4.2.).
 
+PageHeaderData 结构定义在 [src/include/storage/bufpage.h](https://github.com/postgres/postgres/blob/master/src/include/storage/bufpage.h)中。
 
+此外，大小超过2 KB (约为8 KB的 1/4 )堆元组，是通过一个称作 **TOAST** (The Oversized-Attribute Storage Technique)的方法来管理和存储的。详情参见[PostgreSQL 官网文档](http://www.postgresql.org/docs/current/static/storage-toast.html) 。
 
-The structure PageHeaderData is defined in [src/include/storage/bufpage.h](https://github.com/postgres/postgres/blob/master/src/include/storage/bufpage.h).
+## 1.4. 写和读元组（tuples）的方法
 
+本章的最后，介绍编写和读取堆元组（heap tuples）的方法。
 
+### 1.4.1. 写堆元组
 
-In addition, heap tuple whose size is greater than about 2 KB (about 1/4 of 8 KB) is stored and managed using a method called **TOAST** (The Oversized-Attribute Storage Technique). Refer [PostgreSQL documentation](http://www.postgresql.org/docs/current/static/storage-toast.html) for details.
+假设1个表由1个页组成，其中仅包含1个堆元组。此页的pd_lower指向第1个行指针，并且行指针和pd_upper都指向第一个堆元组。参见 图 1.5（a）。
 
-## 1.4. The Methods of Writing and Reading Tuples
+当插入第2个元组时，它被放置在第1个元组之后。第2个行指针被推到第1个，它指向第2个元组。 pd_lower变为指向第2个行指针，而pd_upper变为指向第2堆元组。参见 图1.5（b）。此页中的其他头部数据（例如pd_lsn，pg_checksum，pg_flag）也被重写为适当的值；在 [小节 5.3](http://www.interdb.jp/pg/pgsql05.html#_5.3.) 和 [小节 9](http://www.interdb.jp/pg/pgsql09.html)描述了更多详细信息。
 
-In the end of this chapter, the methods of writing and reading heap tuples are described.
-
-### 1.4.1. Writing Heap Tuples
-
-Suppose a table composed of one page which contains just one heap tuple. The pd_lower of this page points to the first line pointer, and both the line pointer and the pd_upper point to the first heap tuple. See Fig. 1.5(a).
-
-When the second tuple is inserted, it is placed after the first one. The second line pointer is pushed onto the first one, and it points to the second tuple. The pd_lower changes to point to the second line pointer, and the pd_upper to the second heap tuple. See Fig. 1.5(b). Other header data within this page (e.g., pd_lsn, pg_checksum, pg_flag) are also rewritten to appropriate values; more details are described in [Section 5.3](http://www.interdb.jp/pg/pgsql05.html#_5.3.) and [Chapter 9](http://www.interdb.jp/pg/pgsql09.html).
-
-**Fig. 1.5. Writing of a heap tuple.**
+**图 1.5. 一个堆元组的写入**
 
 ![Fig. 1.5. Writing of a heap tuple.](http://www.interdb.jp/pg/img/fig-1-05.png)![img]()
 
-### 1.4.2. Reading Heap Tuples
+### 1.4.2. 读堆元组
 
-Two typical access methods, sequential scan and B-tree index scan, are outlined here:
+两种典型的访问方法 - 顺序扫描（sequential scan）和B树索引扫描（B-tree index scan），描述如下：
 
-- **Sequential scan** – All tuples in all pages are sequentially read by scanning all line pointers in each page. See Fig. 1.6(a).
-- **B-tree index scan** – An index file contains index tuples, each of which is composed of an index key and a TID pointing to the target heap tuple. If the index tuple with the key that you are looking for has been found, PostgreSQL reads the desired heap tuple using the obtained TID value. (The description of the way to find the index tuples in B-tree index is not explained here as it is very common and the space here is limited. See the relevant materials.) For example, in Fig. 1.6(b), TID value of the obtained index tuple is ‘(block = 7, Offset = 2)’. It means that the target heap tuple is 2nd tuple in the 7th page within the table, so PostgreSQL can read the desired heap tuple without unnecessary scanning in the pages.
+- **顺序扫描** – 通过扫描每一页中的所有行指针，顺序读取所有页中的所有元组。参见 图1.6（a）。
+- **B树索引扫描** – 一个索引文件包含多个索引元组，每个索引元组都由索引键和指向目标堆元组的TID组成。如果找到了具有您要查找的键的索引元组，则PostgreSQL使用获得的TID值读取所需的堆元组。（这里不解释在B树索引中查找索引元组的方法的描述，因为它很常见，并且这里的空间有限。请自行参考相关材料。）例如，在 图1.6（b）中，获得的索引元组的TID值是“（block= 7，Offset= 2）”。这意味着目标堆元组是表中第7页中的第2个元组，因此PostgreSQL可以读取所需的堆元组，而无需在页面中进行不必要的扫描。
 
-**Fig. 1.6. Sequential scan and index scan.**
+**图 1.6. 顺序扫描和索引扫描**
 
 ![Fig. 1.6. Sequential scan and index scan.](http://www.interdb.jp/pg/img/fig-1-06.png)![img]()
 
-
-
  *Indexes Internals*
 
-This document does not explain indexes in details. To understand them, I recommend to read the valuable posts shown below:
+本文档未详细介绍索引。要了解它们，我建议阅读以下所示的很有用的文章：
 
 - [Indexes in PostgreSQL — 1](https://postgrespro.com/blog/pgsql/3994098)
 - [Indexes in PostgreSQL — 2](https://postgrespro.com/blog/pgsql/4161264)
@@ -299,13 +285,9 @@ This document does not explain indexes in details. To understand them, I recomme
 - [Indexes in PostgreSQL — 7 (GIN)](https://habr.com/en/company/postgrespro/blog/448746/)
 - [Indexes in PostgreSQL — 9 (BRIN)](https://habr.com/en/company/postgrespro/blog/452900/)
 
+PostgreSQL也支持 TID-Scan、[Bitmap-Scan](https://wiki.postgresql.org/wiki/Bitmap_Indexes) 和 Index-Only-Scan。
 
-
-
-
-PostgreSQL also supports TID-Scan, [Bitmap-Scan](https://wiki.postgresql.org/wiki/Bitmap_Indexes), and Index-Only-Scan.
-
-TID-Scan is a method that accesses a tuple directly by using TID of the desired tuple. For example, to find the 1st tuple in the 0-th page within the table, issue the following query:
+TID-Scan是一种通过使用所需元组的TID直接访问元组的方法。例如，要在表的第0页中找到第1个元组，请发出以下查询：
 
 ```sql-monosp
 sampledb=# SELECT ctid, data FROM sampletbl WHERE ctid = '(0,1)';
@@ -315,4 +297,4 @@ sampledb=# SELECT ctid, data FROM sampletbl WHERE ctid = '(0,1)';
 (1 row)
 ```
 
-Index-Only-Scan will be described in details in [Chapter 7](http://www.interdb.jp/pg/pgsql07.html).
+Index-Only-Scan 将会在 [第 7 章](http://www.interdb.jp/pg/pgsql07.html)详细介绍。
