@@ -276,14 +276,14 @@ PageHeaderData 结构定义在 [src/include/storage/bufpage.h](https://github.co
 
 本文档未详细介绍索引。要了解它们，我建议阅读以下所示的很有用的文章：
 
-- [Indexes in PostgreSQL — 1](https://postgrespro.com/blog/pgsql/3994098)
-- [Indexes in PostgreSQL — 2](https://postgrespro.com/blog/pgsql/4161264)
-- [Indexes in PostgreSQL — 3 (Hash)](https://postgrespro.com/blog/pgsql/4161321)
-- [Indexes in PostgreSQL — 4 (Btree)](https://postgrespro.com/blog/pgsql/4161516)
-- [Indexes in PostgreSQL — 5 (GiST)](https://postgrespro.com/blog/pgsql/4175817)
-- [Indexes in PostgreSQL — 6 (SP-GiST)](https://habr.com/en/company/postgrespro/blog/446624/)
-- [Indexes in PostgreSQL — 7 (GIN)](https://habr.com/en/company/postgrespro/blog/448746/)
-- [Indexes in PostgreSQL — 9 (BRIN)](https://habr.com/en/company/postgrespro/blog/452900/)
+- [ PostgreSQL中的索引 — 1](https://postgrespro.com/blog/pgsql/3994098)
+- [PostgreSQL中的索引 — 2](https://postgrespro.com/blog/pgsql/4161264)
+- [PostgreSQL中的索引 — 3 (Hash)](https://postgrespro.com/blog/pgsql/4161321)
+- [PostgreSQL中的索引 — 4 (Btree)](https://postgrespro.com/blog/pgsql/4161516)
+- [PostgreSQL中的索引 — 5 (GiST)](https://postgrespro.com/blog/pgsql/4175817)
+- [PostgreSQL中的索引 — 6 (SP-GiST)](https://habr.com/en/company/postgrespro/blog/446624/)
+- [PostgreSQL中的索引 — 7 (GIN)](https://habr.com/en/company/postgrespro/blog/448746/)
+- [PostgreSQL — 9 (BRIN)](https://habr.com/en/company/postgrespro/blog/452900/)
 
 PostgreSQL也支持 TID-Scan、[Bitmap-Scan](https://wiki.postgresql.org/wiki/Bitmap_Indexes) 和 Index-Only-Scan。
 
