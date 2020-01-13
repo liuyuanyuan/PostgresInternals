@@ -1,64 +1,60 @@
-# Chapter 3  Query Processing
+# 3  查询处理
 
-As described in the [official document](https://www.postgresql.org/docs/current/static/features.html), PostgreSQL supports a very large number of features required by the SQL standard of 2011. Query processing is the most complicated subsystem in PostgreSQL, and it efficiently processes the supported SQL. This chapter outlines this query processing; in particular, it focuses on query optimization.
+正如 [官方文档](https://www.postgresql.org/docs/current/static/features.html) 所述，PostgreSQL支持大量2011年SQL标准所要求的特性。查询处理是PostgreSQL中最复杂的子系统，它可以有效地处理受支持的SQL。本章概述了该查询处理；尤其是，它专注于查询优化。
 
-This chapter comprises the following three parts:
+本章包括以下三个部分：
 
-- **Part 1:** Section 3.1.
-- This section overviews the query processing in PostgreSQL.
+- **第 1 部分:** 小节 3.1.
+- 本节概述了PostgreSQL中的查询处理。
 
-- **Part 2:** Sections 3.2. — 3.4.
-- This part explains the steps followed to obtain the optimal plan of a single-table query. In Sections 3.2 and 3.3, the processes of estimating the cost and creating the plan tree are explained, respectively. In Section 3.4, the operation of the executor is briefly described.
+- **第 2 部分:** 小节 3.2. — 3.4.
+- 本部分说明了获取单表查询最佳计划的需要遵循的步骤。在第3.2节和第3.3节中，分别说明了估算成本和创建计划树的过程。在第3.4节中，简要描述了执行器的操作。
 
-- **Part 3:** Sections 3.5. — 3.6.
-- This part explains the process of obtaining the optimal plan of a multiple-table query. In Section 3.5, three join methods are described: nested loop, merge and hash join. In Section 3.6, the process of creating the plan tree of a multiple-table query is explained.
+- **第 3 部分:** 小节 3.5. — 3.6.
+- 本部分说明获取多表查询的最佳计划的过程。在第3.5节中，描述了三种联接方法：嵌套循环，合并和哈希联接。在第3.6节中，说明了创建多表查询的计划树的过程。
 
-PostgreSQL supports three technically interesting and practical features, namely, [Foreign Data Wrappers (FDW)](http://www.postgresql.org/docs/current/static/fdwhandler.html), [Parallel Query](https://www.postgresql.org/docs/current/static/parallel-query.html) and [JIT compilation](https://www.postgresql.org/docs/11/static/jit-reason.html) which is supported from version 11. The first two of them will be described in [Chapter 4](http://www.interdb.jp/pg/pgsql04.html). The JIT compilation is out of scope of this document; see the [official document](https://www.postgresql.org/docs/11/static/jit-reason.html) in details.
+PostgreSQL 支持三种技术上有趣且实用的功能，即 [外部数据封装器 (FDW)](http://www.postgresql.org/docs/current/static/fdwhandler.html), [并行查询](https://www.postgresql.org/docs/current/static/parallel-query.html) 和 [即时（JIT）编译](https://www.postgresql.org/docs/11/static/jit-reason.html) ，自版本11开始支持。 其中前两个将在 [第 4 章](http://www.interdb.jp/pg/pgsql04.html) 进行介绍。 JIT 编译超出了本文档的范围；详情请参阅 [官方文档](https://www.postgresql.org/docs/11/static/jit-reason.html) 。
 
-## 3.1. Overview
+## 3.1. 综述
 
-In PostgreSQL, although the parallel query implemented in version 9.6 uses multiple background worker processes, a backend process basically handles all queries issued by the connected client. This backend consists of five subsystems, as shown below:
+在PostgreSQL中， 尽管在版本9.6中实现的并行查询使用了多个后台工作进程，但后端进程基本上可以处理由连接的客户端发出的所有查询。该后端包含五个子系统，如下所示：
 
-1. Parser
-2. The parser generates a parse tree from an SQL statement in plain text.
+1. 解析器（Parser）
+2. 解析器对纯文本格式的SQL语句解析生成一棵解析树。
 
-3. Analyzer/Analyser
-4. The analyzer/analyser carries out a semantic analysis of a parse tree and generates a query tree.
+3. 分析器（Analyzer/Analyser）
+4. 分析器对解析树进行语义分析生成一棵查询树。
 
-5. Rewriter
-6. The rewriter transforms a query tree using the rules stored in the [rule system](http://www.postgresql.org/docs/current/static/rules.html) if such rules exist.
+5. 重写器（Rewriter）
+6. 如果存储在[规则系统](http://www.postgresql.org/docs/current/static/rules.html)中的规则存在，重写器会使用这些规则来转换查询树。
 
-7. Planner
-8. The planner generates the plan tree that can most effectively be executed from the query tree.
+7. 计划器（Planner）
+8. 计划器生成计划树，计划树可以在查询树得到最有效的执行。
 
-9. Executor
-10. The executor executes the query via accessing the tables and indexes in the order that was created by the plan tree.
+9. 执行器（Executor）
+10. 执行器通过按计划树创建的顺序访问表和索引，来执行查询。
 
-**Fig. 3.1. Query Processing.**
+**图 3.1. 查询处理**
 
 ![Fig. 3.1. Query Processing.](http://www.interdb.jp/pg/img/fig-3-01.png)![img]()
 
-In this section, an overview of these subsystems is provided. Due to the fact that the planner and the executor are very complicated, a detailed explanation for these functions will be provided in the following sections.
+在本节中，提供了这些子系统的概述。由于计划器和执行器非常复杂，因此接下来几节将对这些功能进行详细说明。
 
+PostgreSQL 的查询处理在[官方文档](http://www.postgresql.org/docs/current/static/overview.html)有详细的介绍。
 
+### 3.1.1. 解析器
 
-PostgreSQL's query processing is described in the [official document](http://www.postgresql.org/docs/current/static/overview.html) in detail.
+解析器将一条纯文本的SQL语句生成一棵解析树，使得后边的子系统可以读取。下面展示了一个具体的例子，但没有详细介绍。
 
-
-
-### 3.1.1. Parser
-
-The parser generates a parse tree that can be read by subsequent subsystems from an SQL statement in plain text. Here a specific example is shown in the following without a detailed description.
-
-Let us consider the query shown below.
+让我们思考下面显示的查询。
 
 ```sql-monosp
 testdb=# SELECT id, data FROM tbl_a WHERE id < 300 ORDER BY data;
 ```
 
-A parse tree is a tree whose root node is the [SelectStmt](javascript:void(0)) structure defined in [parsenodes.h](https://github.com/postgres/postgres/blob/master/src/include/nodes/parsenodes.h). Figure 3.2(b) illustrates the parse tree of the query shown in Fig. 3.2(a).
+一棵解析树就是一棵根节点为[SelectStmt](javascript:void(0)) 结构（定义在[parsenodes.h](https://github.com/postgres/postgres/blob/master/src/include/nodes/parsenodes.h)）的树。图 3.2(a)中查询对应的解析树是图 3.2(b) 。
 
-**Fig. 3.2. An example of a parse tree.**
+**图 3.2. 一棵解析树的示例**
 
 ![Fig. 3.2. An example of a parse tree.](http://www.interdb.jp/pg/img/fig-3-02.png)![img]()
 
