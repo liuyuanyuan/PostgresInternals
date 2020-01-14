@@ -6,7 +6,7 @@
 
 ## 4.1. 外部数据封装器 (FDW)
 
-2003 年，在SQL标准中添加了一个访问远程数据的规范，称为[[外部数据的 SQL 管理(SQL Management of External Data)](https：//wiki.postgresql.org/wiki/SQL/MED)（SQL/MED）。自版本 9.1 以来，PostgreSQL 一直在开发此功能，以实现一项自己的 SQL/MED。
+2003 年，在SQL标准中添加了一个访问远程数据的规范，称为[外部数据的SQL管理(SQL Management of External Data)](https：//wiki.postgresql.org/wiki/SQL/MED)（SQL/MED）。自版本 9.1 以来，PostgreSQL 一直在开发此功能，以实现一项自己的 SQL/MED。
 
 在SQL/MED规范中，远程服务器上的表称作*外部表（foreign table）*。PostgreSQL的**外部数据封装器 (FDW)** 是使用 SQL/MED 来像管理本地表一样来管理类外部表。
 
