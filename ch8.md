@@ -1,291 +1,318 @@
-# Chapter 8  Buffer Manager
+# 8  缓冲区管理器（Buffer Manager）
 
-Abuffer manager manages data transfers between shared memory and persistent storage and can have a significant impact on the performance of the DBMS. The PostgreSQL buffer manager works very efficiently.
+>附：缓冲（Buffer）和缓存（Cache）的区别
+>
+>Buffer和Cache翻译成中文分别是“缓冲”和“缓存”。buffer和cache都是一部分内存，内存的作用就是缓解CPU和IO（如，磁盘）的速度差距的。
+>
+>CPU计算了一些数据后，在内存中进行临时存放，到一定数量后再统一放到硬盘中，这时要用的内存就是buffer；
+>
+>CPU要计算时，需要把数据从磁盘中读出来，临时先放到内存中，这部分内存就是cache。
+>
+>cache 是为了弥补高速设备和低速设备的鸿沟而引入的中间层，最终起到加快访问速度的作用。而 buffer 的主要目的进行流量整形，把突发的大数量较小规模的 I/O 整理成平稳的小数量较大规模的 I/O，以减少响应次数（比如从网上下电影，你不能下一点点数据就写一下硬盘，而是积攒一定量的数据以后一整块一起写，不然硬盘都要被你玩坏了）。
+>
+>原文链接：https://blog.csdn.net/zsx157326/article/details/79010239
+
+缓冲管理器管理共享内存和持久性存储之间的数据传输，并且可能对DBMS的性能产生显著影响。 PostgreSQL缓冲区管理器非常有效地工作。
+
+在本章中，将介绍PostgreSQL缓存区管理器。第一节提供了概述，随后的小节介绍了以下主题：
+
+A buffer manager manages data transfers between shared memory and persistent storage and can have a significant impact on the performance of the DBMS. The PostgreSQL buffer manager works very efficiently.
 
 In this chapter, the PostgreSQL buffer manager is described. The first section provides an overview and the subsequent sections describe the following topics:
 
-- Buffer manager structure
-- Buffer manager locks
-- How the buffer manager works
-- Ring buffer
-- Flushing of dirty pages
+- 缓冲区管理器架构
+- 缓冲区管理器锁
+- 缓冲区管理器如何工作
+- 环形缓冲区（Ring buffer）
+- 冲洗脏页（Flushing of dirty pages）
 
-**Fig. 8.1. Relations between buffer manager, storage, and backend processes.**
+**图 8.1. 缓冲区管理器、存储和后端进程之间的关系**
 
 ![Fig. 8.1. Relations between buffer manager, storage, and backend processes.](http://www.interdb.jp/pg/img/fig-8-01.png)![img]()
 
-## 8.1. Overview
+## 8.1. 概述
 
-This section introduces key concepts required to facilitate descriptions in the subsequent sections.
+本节介绍了几个关键概念，以便在后续各节中的理解。
 
-### 8.1.1. Buffer Manager Structure
+### 8.1.1. 缓冲区管理器架构
 
-The PostgreSQL buffer manager comprises a buffer table, buffer descriptors, and buffer pool, which are described in the next section. The **buffer pool** layer stores data file pages, such as tables and indexes, as well as [freespace maps](http://www.interdb.jp/pg/pgsql05.html#_5.3.4.) and [visibility maps](http://www.interdb.jp/pg/pgsql06.html#_6.2.). The buffer pool is an array, i.e., each slot stores one page of a data file. Indices of a buffer pool array are referred to as **buffer_id**s.
+PostgreSQL缓冲区管理器包含一个缓冲区表、缓冲区描述符和缓冲池，这将在下一节中介绍。 **缓存池（buffer pool）**层存储数据文件页，例如表和索引，以及[空闲空间映射（freespace maps）](http://www.interdb.jp/pg/pgsql05.html#_5.3.4.) 和 [可见性映射（visibility maps）](http://www.interdb.jp/pg/pgsql06.html#_6.2.)。缓冲池是一个数组，即每个插槽存储一个数据文件的一个页。缓存池阵列的索引称为**buffer_id**。
 
-[Sections 8.2](http://www.interdb.jp/pg/pgsql08.html#_8.2.) and [8.3](http://www.interdb.jp/pg/pgsql08.html#_8.3.) describe the details of the buffer manager internals.
+[小节 8.2](http://www.interdb.jp/pg/pgsql08.html#_8.2.) 和 [8.3](http://www.interdb.jp/pg/pgsql08.html#_8.3.) 介绍了缓存区管理器内部的详细情况。
 
-### 8.1.2. Buffer Tag
+### 8.1.2. 缓冲区标签（Buffer Tag）
 
-In PostgreSQL, each page of all data files can be assigned a unique tag, i.e. a **buffer tag**. When the buffer manager receives a request, PostgreSQL uses the buffer_tag of the desired page.
+在PostgreSQL中，可以为所有数据文件的每一页分配一个唯一的标签，即**缓冲区标签**。当缓冲区管理器收到请求时，PostgreSQL使用所需页面的buffer_tag。
 
-The [buffer_tag](javascript:void(0)) comprises three values: the [RelFileNode](javascript:void(0)) and the fork number of the relation to which its page belongs, and the block number of its page. The fork numbers of tables, freespace maps and visibility maps are defined in 0, 1 and 2, respectively.
+ [缓冲区标签](javascript:void(0))包含3个值：**RelFileNode**和其页所属关系的**派生号（fork number）**，以及其页的**块号（block number）**。表、空闲空间映射和可见性映射的派生编号分别在0、1和2中定义。
 
-For example, the buffer_tag '{(16821, 16384, 37721), 0, 7}' identifies the page that is in the seventh block whose relation's OID and fork number are 37721 and 0, respectively; the relation is contained in the database whose OID is 16384 under the tablespace whose OID is 16821. Similarly, the buffer_tag '{(16821, 16384, 37721), 1, 3}' identifies the page that is in the third block of the freespace map whose OID and fork number are 37721 and 1, respectively.
+例如，buffer_tag '{(16821, 16384, 37721), 0, 7}' 标识位于第7个块中的页，其relation OID和派生号分别为37721和0；该relation在OID为16821的表空间下的OID为16384的数据库中。同样地，buffer_tag '{(16821, 16384, 37721), 1, 3}' 标识位于自由空间映射的第3个块中的页，其OID和派生号分别为37721和1。
 
-### 8.1.3. How a Backend Process Reads Pages
+```c-monosp
+/*
+ * Buffer tag identifies which disk block the buffer contains.
+ *
+ * Note: the BufferTag data must be sufficient to determine where to write the
+ * block, without reference to pg_class or pg_tablespace entries.  It's
+ * possible that the backend flushing the buffer doesn't even believe the
+ * relation is visible yet (its xact may have started before the xact that
+ * created the rel).  The storage manager must be able to cope anyway.
+ *
+ * Note: if there's any pad bytes in the struct, INIT_BUFFERTAG will have
+ * to be fixed to zero them, since this struct is used as a hash key.
+ */
+typedef struct buftag
+{
+	RelFileNode rnode;			/* physical relation identifier */
+	ForkNumber	forkNum;
+	BlockNumber blockNum;		/* blknum relative to begin of reln */
+} BufferTag;
+```
 
-This subsection describes how a backend process reads a page from the buffer manager (Fig. 8.2).
+### 8.1.3. 后端进程如何读取页
 
-**Fig. 8.2. How a backend reads a page from the buffer manager.**
+本小节介绍后端进程如何从缓冲区管理器中读取页（图 8.2）。
+
+**图 8.2. 后端如何从缓冲区管理器中读取页**
 
 ![Fig. 8.2. How a backend reads a page from the buffer manager.](http://www.interdb.jp/pg/img/fig-8-02.png)![img]()
 
-- (1) When reading a table or index page, a backend process sends a request that includes the page's buffer_tag to the buffer manager.
-- (2) The buffer manager returns the buffer_ID of the slot that stores the requested page. If the requested page is not stored in the buffer pool, the buffer manager loads the page from persistent storage to one of the buffer pool slots and then returns the buffer_ID's slot.
-- (3) The backend process accesses the buffer_ID's slot (to read the desired page).
+- （1）读取表或索引页时，后端进程会将包含页的buffer_tag的请求发送到缓冲区管理器。
+- （2）缓冲区管理器会返回buffer_ID（存储了请求页的插槽的）。如果请求的页未存储在缓冲池中，则缓冲区管理器将页面从持久性存储加载到其中一个缓冲池插槽中，然后返回buffer_ID的插槽。
+- （3）后端进程访问buffer_ID的插槽（以读取所需的页）。
 
-When a backend process modifies a page in the buffer pool (e.g., by inserting tuples), the modified page, which has not yet been flushed to storage, is referred to as a **dirty page**.
+当后端进程修改缓冲池中的页面（例如，通过插入元组）时，尚未刷到存储中的修改后的页称为 **脏页（dirty page）**。
 
-[Section 8.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.) describes how buffer manager works.
+[小节 8.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.) 介绍了缓冲区管理器的工作方式。
 
-### 8.1.4. Page Replacement Algorithm
+### 8.1.4. 页替换算法
 
-When all buffer pool slots are occupied but the requested page is not stored, the buffer manager must select one page in the buffer pool that will be replaced by the requested page. Typically, in the field of computer science, page selection algorithms are called *page replacement algorithms* and the selected page is referred to as a **victim page**.
+当所有缓冲池插槽均被占用但请求的页未被存储时，缓冲管理器必须在缓冲池中选择一个页，该页将由请求的页替换。通常，在计算机科学领域中，页选择算法称为*页替换算法（page replacement algorithms）*，而被选定的页面称为**victim page**。
 
-Research on page replacement algorithms has been ongoing since the advent of computer science; thus, many replacement algorithms have been proposed previously. Since version 8.1, PostgreSQL has used **clock sweep** because it is simpler and more efficient than the LRU algorithm used in previous versions.
+自计算机科学问世以来，对页面替换算法的研究一直在进行。由于，先前已经提出了许多替换算法。从版本8.1开始，PostgreSQL使用了**clock sweep**，因为它比以前版本中使用的LRU算法更简单、更高效。
 
-[Section 8.4.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.) describes the details of clock-sweep.
+[小节 8.4.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.) 详细介绍了clock-sweep。
 
-### 8.1.5. Flushing Dirty Pages
+### 8.1.5. 刷脏页
 
-Dirty pages should eventually be flushed to storage; however, the buffer manager requires help to perform this task. In PostgreSQL, two background processes, **checkpointer** and **background writer**, are responsible for this task.
+脏页最终应刷新到存储中；但是，缓冲区管理器需要协助才能执行此任务。在PostgreSQL中，两个后台进程 - **checkpointer **和**background writer** - 负责此任务。
 
-[Section 8.6](http://www.interdb.jp/pg/pgsql08.html#_8.6.) describes the checkpointer and background writer.
+[小节 8.6](http://www.interdb.jp/pg/pgsql08.html#_8.6.) 介绍了checkpointer和background writer。
 
+> **Direct I/O**
+>
+> PostgreSQL  **不** 支持Direct I/O，尽管有时会对其讨论。如果你想了解更多详细内容，请参阅pgsql-ML上的[这个讨论](http://www.postgresql.org/message-id/529E267F.4050700@agliodbs.com)和[这篇文章](http://lwn.net/Articles/580542/)。
 
+## 8.2. 缓冲区管理器架构
 
- *Direct I/O*
+PostgreSQL缓冲管理器包换三层：即 *缓冲区表（buffer table）*、 *缓冲区描述符（buffer descriptors）*和 *缓冲池（buffer pool）* （图 8.3）：
 
-PostgreSQL does **not** support direct I/O, though sometimes it has been discussed. If you want to know more details, refer to [this discussion](http://www.postgresql.org/message-id/529E267F.4050700@agliodbs.com) on the pgsql-ML and [this article](http://lwn.net/Articles/580542/).
-
-
-
-## 8.2. Buffer Manager Structure
-
-The PostgreSQL buffer manager comprises three layers, i.e. the *buffer table*, *buffer descriptors*, and *buffer pool* (Fig. 8.3):
-
-**Fig. 8.3. Buffer manager's three-layer structure.**
+**图 8.3. 缓冲管理器的三层架构**
 
 ![Fig. 8.3. Buffer manager's three-layer structure.](http://www.interdb.jp/pg/img/fig-8-03.png)![img]()
 
- 
+- **buffer pool**是一个数组。每个插槽存储一个数据文件页。数组插槽的索引称为*buffer_id*。
+- **buffer descriptors**层是buffer descriptors的数组。每个描述符都与缓冲池插槽有一对一的对应关系, 并持有相应插槽中存储页的元数据。
+  请注意, 为了方便起见, 采用了 “缓冲区描述符图层” 一词, 并且仅在本文档中使用。
+- **buffer table**是一个哈希表, 用于存储（存储页的）*buffer_tag* 以及 （持有存储页各元数据的描述符的）*buffer_id*之间的关系。
 
+在以下小节中将详细介绍这些层。
 
+### 8.2.1. 缓冲区表（Buffer Table）
 
-- The **buffer pool** is an array. Each slot stores a data file pages. The indices of the array slots are referred to as *buffer_id*s.
-- The **buffer descriptors** layer is an array of buffer descriptors. Each descriptor has one-to-one correspondence to a buffer pool slot and holds metadata of the stored page in the corresponding slot.
-  Note that the term ‘buffer descriptors layer’ has been adopted for convenience and it is only used in this document.
-- The **buffer table** is a hash table that stores the relations between the *buffer_tag*s of stored pages and the *buffer_id*s of the descriptors that hold the stored pages' respective metadata.
+一张buffer table可以被逻辑划分为三部分：一个哈希函数（hash function）、哈希存储桶插槽（hash bucket slots）和数据条目（data entries）（图 8.4）。
 
+内置的哈希函数将buffer_tags映射到哈希存储桶插槽。即使哈希存储桶插槽的数量大于缓冲池插槽的数量，也会发生冲突。因此，buffer table使用带*linked lists*方法的*separate chaining*来解决冲突。当数据条目被映射到相同的存储桶插槽时，此方法将条目存储在相同的linked list中，如 图 8.4 所示。
 
-
-These layers are described in detail in the following subsections.
-
-### 8.2.1. Buffer Table
-
-A buffer table can be logically divided into three parts: a hash function, hash bucket slots, and data entries (Fig. 8.4).
-
-The built-in hash function maps buffer_tags to the hash bucket slots. Even though the number of hash bucket slots is greater than the number of the buffer pool slots, collisions may occur. Therefore, the buffer table uses a *separate chaining with linked lists* method to resolve collisions. When data entries are mapped to the same bucket slot, this method stores the entries in the same linked list, as shown in Fig. 8.4.
-
-**Fig. 8.4. Buffer table.**
+**图 8.4. Buffer table.**
 
 ![Fig. 8.4. Buffer table.](http://www.interdb.jp/pg/img/fig-8-04.png)![img]()
 
-A data entry comprises two values: the buffer_tag of a page, and the buffer_id of the descriptor that holds the page's metadata. For example, a data entry ‘*Tag_A, id=1*’ means that the buffer descriptor with buffer_id *1* stores metadata of the page tagged with *Tag_A*.
+一个数据条目包括两个值: 页的buffer_tag和持有页的元数据的描述符的buffer_id。例如, 一个数据条目 “Tag_A, id=1” ，意味着带有buffer_id为1的buffer descriptor 存储标记为tag_A 的页的元数据。
 
-
-
- *Hash function*
-
-The hash function is a composite function of [calc_bucket()](https://doxygen.postgresql.org/dynahash_8c.html#ae802f2654df749ae0e0aadf4b5c5bcbd) and [hash()](https://doxygen.postgresql.org/rege__dfa_8c.html#a6aa3a27e7a0fc6793f3329670ac3b0cb). The following is its representation as a pseudo-function.
+> **哈希函数**
+>
+> 哈希函数是 [calc_bucket()](https://doxygen.postgresql.org/dynahash_8c.html#ae802f2654df749ae0e0aadf4b5c5bcbd) 和 [hash()](https://doxygen.postgresql.org/rege__dfa_8c.html#a6aa3a27e7a0fc6793f3329670ac3b0cb)的组合函数。以下是其作为伪函数的表示。
 
 ```c
 uint32 bucket_slot = calc_bucket(unsigned hash(BufferTag buffer_tag), uint32 bucket_size)
 ```
 
+请注意，此处不解释基本操作（查找，插入和删除数据条目）。这些是非常常见的操作，将在以下各节中进行说明。
 
+### 8.2.2. 缓冲区描述符（Buffer Descriptor）
 
-Note that basic operations (look up, insertion, and deletion of data entries) are not explained here. These are very common operations and are explained in the following sections.
+本子节介绍了缓冲区描述符的结构, 下一节将介绍缓冲区描述符层。
 
-### 8.2.2. Buffer Descriptor
+缓冲区描述符将存储页的元数据保存在相应的缓冲池插槽中。缓冲区描述符结构由[BufferDesc](javascript:void(0))定义。虽然此结构有许多字段, 但主要的如下所示:
 
-The structure of buffer descriptor is described in this subsection, and the buffer descriptors layer in the next subsection.
+```c-monosp
+/*
+ * Flags for buffer descriptors
+ *
+ * Note: TAG_VALID essentially means that there is a buffer hashtable
+ * entry associated with the buffer's tag.
+ */
+#define BM_DIRTY                (1 << 0)    /* data needs writing */
+#define BM_VALID                (1 << 1)    /* data is valid */
+#define BM_TAG_VALID            (1 << 2)    /* tag is assigned */
+#define BM_IO_IN_PROGRESS       (1 << 3)    /* read or write in progress */
+#define BM_IO_ERROR             (1 << 4)    /* previous I/O failed */
+#define BM_JUST_DIRTIED         (1 << 5)    /* dirtied since write started */
+#define BM_PIN_COUNT_WAITER     (1 << 6)    /* have waiter for sole pin */
+#define BM_CHECKPOINT_NEEDED    (1 << 7)    /* must write for checkpoint */
+#define BM_PERMANENT            (1 << 8)    /* permanent relation (not unlogged) */
 
-Buffer descriptor holds the metadata of the stored page in the corresponding buffer pool slot. The buffer descriptor structure is defined by the structure [BufferDesc](javascript:void(0)). While this structure has many fields, mainly ones are shown in the following:
+src/include/storage/buf_internals.h
+typedef struct sbufdesc
+{
+   BufferTag    tag;                 /* ID of page contained in buffer */
+   BufFlags     flags;               /* see bit definitions above */
+   uint16       usage_count;         /* usage counter for clock sweep code */
+   unsigned     refcount;            /* # of backends holding pins on buffer */
+   int          wait_backend_pid;    /* backend PID of pin-count waiter */
+   slock_t      buf_hdr_lock;        /* protects the above fields */
+   int          buf_id;              /* buffer's index number (from 0) */
+   int          freeNext;            /* link in freelist chain */
 
-- **tag** holds the *buffer_tag* of the stored page in the corresponding buffer pool slot (buffer tag is defined in [Section 8.1.2](http://www.interdb.jp/pg/pgsql08.html#_8.1.2.)).
+   LWLockId     io_in_progress_lock; /* to wait for I/O to complete */
+   LWLockId     content_lock;        /* to lock access to buffer contents */
+} BufferDesc;
+```
 
-- **buffer_id** identifies the descriptor (equivalent to the *buffer_id* of the corresponding buffer pool slot).
+- **tag**将存储页的*buffer_tag*保存在相应的缓冲池插槽中(buffer_tag在[小节 8.1.2](http://www.interdb.jp/pg/pgsql08.html#_8.1.2.)中定义)。
 
-- **refcount** holds the number of PostgreSQL processes currently accessing the associated stored page. It is also referred to as **pin count**. When a PostgreSQL process accesses the stored page, its refcount must be incremented by 1 (refcount++). After accessing the page, its refcount must be decreased by 1 (refcount--).
-  When the refcount is zero, i.e. the associated stored page is not currently being accessed, the page is **unpinned**; otherwise it is **pinned**.
+- **buffer_id**标识描述符(等效于相应缓冲池插槽中的*buffer_tag*)。
 
-- **usage_count** holds the number of times the associated stored page has been accessed since it was loaded into the corresponding buffer pool slot. Note that usage_count is used in the page replacement algorithm ([Section 8.4.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.)).
+- **refcount**保存当前访问关联存储页的PostgreSQL进程的数量。它也称为 **pin count**。当PostgreSQL进程访问存储的页面时, 其重新计数必须加1(refcount ++)。访问页面后, 其重新计数必须减1(重新计数–)。
+  当refcount为零时，即当前关联的存储页没有被访问, 则该页 **unpinned**;否则为**pinned**。
 
-- **context_lock** and **io_in_progress_lock** are light-weight locks that are used to control access to the associated stored page. These fields are described in [Section 8.3.2](http://www.interdb.jp/pg/pgsql08.html#_8.3.2.).
+- **usage_count**保存关联存储页自加载到相应的缓冲池插槽以来被访问的次数。请注意，页面替换算法中使用了usage_count ([小节 8.4.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.))。
+
+- context_lock和io_in_process_lock是轻量级锁, 用于控制对关联存储页的访问。这些字段在[小节 8.3.2](http://www.interdb.jp/pg/pgsql08.html#_8.3.2.)中进行了说明。
 
 - flags
 
-   
+  可以保存关联存储页的多个状态。主要状态如下:
 
-  can hold several states of the associated stored page. The main states are as follows:
+  - **dirty bit**标识存储的页面是否脏。
+  - **valid bit**标识存储的页面是否可以读取或写入 (有效)。例如，如果此位是*valid*, 则相应的缓冲池插槽将存储一个页面，并且此描述符 (有效位) 保存页面元数据；因此，存储的页面可以读取或写入。如果此位无效，则此描述符不包含任何元数据。这意味着无法读取或写入存储的页面，或者缓冲区管理器正在替换存储的页面。
+  - **io_in_process_lock**标识着缓冲区管理器是否正在读写从存储或者到存储的关联页面。换句话说, 此bit表示单个进程是否持有此描述符的io_in_process_lock。
 
-  - **dirty bit** indicates whether the stored page is dirty.
-  - **valid bit** indicates whether the stored page can be read or written (valid). For example, if this bit is *valid*, then the corresponding buffer pool slot stores a page and this descriptor (valid bit) holds the page metadata; thus, the stored page can be read or written. If this bit is *invalid*, then this descriptor does not hold any metadata; this means that the stored page cannot be read or written or the buffer manager is replacing the stored page.
-  - **io_in_progress bit** indicates whether the buffer manager is reading/writing the associated page from/to storage. In other words, this bit indicates whether a single process holds the io_in_progress_lock of this descriptor.
+- freeNext是一个指向下一个描述符的指针, 用于生成一个freelist, 这将在下一个小节中介绍。
 
-- **freeNext** is a pointer to the next descriptor to generate a *freelist*, which is described in the next subsection.
+结构体 *BufferDesc* 定义在 [src/include/storage/buf_internals.h](https://github.com/postgres/postgres/blob/master/src/include/storage/buf_internals.h) 中。
 
+为了简化以下描述，定义了三个描述符状态
 
+- **Empty**：当相应的缓冲池插槽不存储页 (即*refcount* 和 *usage_count*  为 0) 时， 此描述符的状态为 *empty*。
+- **Pinned**：当相应的缓冲池插槽存储一个页，并且PostgreSQL进程正在访问该页 (即*refcount*和*usage_count*大于等于1) 时, 此缓冲区描述符的状态为*pinned*。
+- **Unpinned**：当相应的缓冲池插槽存储一个页， 但没有PostgreSQL进程访问该页(即usage_count大于等于 1，但refcount为0) 时，此缓冲区描述符的状态为*unpinned*。
 
-The structure *BufferDesc* is defined in [src/include/storage/buf_internals.h](https://github.com/postgres/postgres/blob/master/src/include/storage/buf_internals.h).
+每个描述符具有上述状态之一。描述符状态相对于特定条件而变化，这将在下一节中进行介绍。
+在下图中, 缓冲区描述符的状态由彩色框表示。
 
+![ch8-1](/Users/liuyuanyuan/PostgresInternals/images/ch8-1.png)
 
+此外， 脏页被表示为"X"。例如，Unpinned的脏描述符由![image-20200115150705327](/Users/liuyuanyuan/PostgresInternals/images/ch8-2.png)表示。
 
+### 8.2.3. 缓冲区描述符层（Buffer Descriptors Layer）
 
+缓冲区描述符的集合构成了一个数组。在本文档中，该数组称为*缓冲区描述符层（*buffer descriptors layer*）*。
+当PostgreSQL服务启动时，所有缓冲区描述符的状态为*empty*。在PostgreSQL中，这些描述符包含一个链表，名为**freelist**（图 8.5）。
 
-To simplify the following descriptions, three descriptor states are defined:
+请注意，PostgreSQL中的**freelist**与Oracle中的**freelists**是完全不同的概念。PostgreSQL的freelist仅仅是空缓冲区描述符的链表。在PostgreSQL 中，空闲空间映射（在 [小节 5.3.4](http://www.interdb.jp/pg/pgsql05.html#_5.3.4.)中介绍的）与Oracle中的freelists起着相同作用。
 
-
-
-- **Empty**: When the corresponding buffer pool slot does not store a page (i.e. *refcount* and *usage_count* are 0), the state of this descriptor is *empty*.
-- **Pinned**: When the corresponding buffer pool slot stores a page and any PostgreSQL processes are accessing the page (i.e. *refcount* and *usage_count* are greater than or equal to 1), the state of this buffer descriptor is *pinned*.
-- **Unpinned**: When the corresponding buffer pool slot stores a page but no PostgreSQL processes are accessing the page (i.e. *usage_count* is greater than or equal to 1, but *refcount* is 0), the state of this buffer descriptor is *unpinned*.
-
-Each descriptor will have one of the above states. The descriptor state changes relative to particular conditions, which are described in the next subsection.
-
-In the following figures, buffer descriptors’ states are represented by coloured boxes.
-
--    (white) *Empty*
--    (blue) *Pinned*
--    (cyan) *Unpinned*
-
-In addition, a dirty page is denoted as ‘X’. For example, an unpinned dirty descriptor is represented by X .
-
-### 8.2.3. Buffer Descriptors Layer
-
-A collection of buffer descriptors forms an array. In this document, the array is referred to as the *buffer descriptors layer*.
-
-When the PostgreSQL server starts, the state of all buffer descriptors is *empty*. In PostgreSQL, those descriptors comprise a linked list called **freelist** (Fig. 8.5).
-
-
-
-Please note that the **freelist** in PostgreSQL is completely different concept from the *freelists* in Oracle. PostgreSQL's freelist is only linked list of empty buffer descriptors. In PostgreSQL *freespace maps*, which are described in [Section 5.3.4](http://www.interdb.jp/pg/pgsql05.html#_5.3.4.), act as the same role of the freelists in Oracle.
-
-
-
-**Fig. 8.5. Buffer manager initial state.**
+**图 8.5. 缓冲区管理器的初始状态**
 
 ![Fig. 8.5. Buffer manager initial state.](http://www.interdb.jp/pg/img/fig-8-05.png)![img]()
 
-Figure 8.6 shows that how the first page is loaded.
+图8.6 显示了第一页是如何加载的。
 
-- (1) Retrieve an empty descriptor from the top of the freelist, and pin it (i.e. increase its refcount and usage_count by 1).
-- (2) Insert the new entry, which holds the relation between the tag of the first page and the buffer_id of the retrieved descriptor, in the buffer table.
-- (3) Load the new page from storage to the corresponding buffer pool slot.
-- (4) Save the metadata of the new page to the retrieved descriptor.
+- （1）从freelist的顶部检索空描述符，并将其pin住（即将refcount和usage_count都增加1)。
+- （2）在buffer table中插入新条目，该条目持有（第1页的标记和检索到的描述符的buffer_id之间的）关系。
+- （3）将新的页从持久化存储加载到相应的缓冲池槽位。
+- （4）将新的页的元数据保存到检索到的描述符中。
 
-The second and subsequent pages are loaded in a similar manner. Additional details are provided in [Section 8.4.2](http://www.interdb.jp/pg/pgsql08.html#_8.4.2.).
+第2个页和后续页以类似方式加载。其他细节在[小节 8.4.2](http://www.interdb.jp/pg/pgsql08.html#_8.4.2.)中提供。
 
-
-
-**Fig. 8.6. Loading the first page.**
+**图 8.6 加载第一个page页**
 
 ![Fig. 8.6. Loading the first page.](http://www.interdb.jp/pg/img/fig-8-06.png)![img]()
 
+从freelist中检索的描述符始终持有page页的元数据。换句话说，继续使用的非空描述符不会返回到空闲列表。然而，相关描述符将再次添加到freelist中，并且当发生以下任一情况时，描述符状态将变为’empty’：
+
 Descriptors that have been retrieved from the freelist always hold page's metadata. In other words, non-empty descriptors continue to be used do not return to the freelist. However, related descriptors are added to the freelist again and the descriptor state becomes ‘empty’ when one of the following occurs:
 
-1. Tables or indexes have been dropped.
-2. Databases have been dropped.
-3. Tables or indexes have been cleaned up using the VACUUM FULL command.
+1. 表或索引已被移除。
+2. 数据库已被移除。
+3. 表或索引已被使用VACUUM FULL命令清除。
 
+ *为什么空描述符构成freelist？*
 
+freelist存在的原因是为了立即获得第1个描述符。这是动态内存资源分配的常用做法。可以参阅[该说明](https://en.wikipedia.org/wiki/Free_list)。
 
- *Why empty descriptors comprise the freelist?*
+缓冲区描述符层包含一个无符号的32位整数变量，即**nextVictimBuffer**。此变量用于 [小节 8.4.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.)中介绍的页替换算法。
 
-The reason why the freelist be made is to get the first descriptor immediately. This is a usual practice for dynamic memory resource allocation. Refer to [this description](https://en.wikipedia.org/wiki/Free_list).
+### 8.2.4. 缓冲池（Buffer Pool）
 
+缓冲池是一个存储数据文件页面的简单数组，例如表和索引。缓冲池阵列的索引称为buffer_ids。
 
+缓冲池插槽大小为8KB，等于一个page页的大小。因此，每个槽可以存储1个完整的page页。
 
-The buffer descriptors layer contains an unsigned 32-bit integer variable, i.e. **nextVictimBuffer**. This variable is used in the page replacement algorithm described in [Section 8.4.4](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.).
+## 8.3. 缓冲区管理器锁（Buffer Manager Locks）
 
-### 8.2.4. Buffer Pool
+缓冲区管理器使用许多锁来实现许多不同的目的。本节介绍锁以便后续章节中所需。
 
-The buffer pool is a simple array that stores data file pages, such as tables and indexes. Indices of the buffer pool array are referred to as *buffer_id*s.
+请注意，本节中描述的锁，是缓冲区管理器的同步机制的一部分;它们与任何SQL语句和SQL选项**无关**。
 
-The buffer pool slot size is 8 KB, which is equal to the size of a page. Thus, each slot can store an entire page.
+### 8.3.1. 缓冲区表锁（Buffer Table Locks）
 
-## 8.3. Buffer Manager Locks
+**BufMappingLock**保护整个缓冲区表的数据完整性。它是一种轻量级锁，可用于共享（share）和独占（exclusive）模式。在buffer table中搜索一个条目时，后端进程持有共享的 BufMappingLock。当插入或删除条目时，后端进程持有一个排他锁（exclusive lock）。
 
-The buffer manager uses many locks for many different purposes. This section describes the locks necessary for the explanations in the subsequent sections.
+BufMappingLock 被拆分为分区以减少缓冲表中的争用（默认为128个分区）。每个BufMappingLock分区都保护相应哈希桶槽的一部分。
 
+图 8.7 显示了一个拆分BufMappingLock的典型示例。两个后端进程在exclusive模式下可以同时持有各自的BufMappingLock分区，以便插入新的数据条目。如果BufMappingLock是单个系统范围的锁，则两个进程都等待另一个进程的处理，具体取决于那个启动的处理。
 
-
-Please note that the locks described in this section are parts of a synchronization mechanism for the buffer manager; they do **not** relate to any SQL statements and SQL options.
-
-
-
-### 8.3.1. Buffer Table Locks
-
-**BufMappingLock** protects the data integrity of the entire buffer table. It is a light-weight lock that can be used in both shared and exclusive modes. When searching an entry in the buffer table, a backend process holds a shared BufMappingLock. When inserting or deleting entries, a backend process holds an exclusive lock.
-
-The BufMappingLock is split into partitions to reduce the contention in the buffer table (the default is 128 partitions). Each BufMappingLock partition guards the portion of the corresponding hash bucket slots.
-
-Figure 8.7 shows a typical example of the effect of splitting BufMappingLock. Two backend processes can simultaneously hold respective BufMappingLock partitions in exclusive mode in order to insert new data entries. If the BufMappingLock is a single system-wide lock, both processes should wait for the processing of another process, depending on which started processing.
-
-**Fig. 8.7. Two processes simultaneously acquire the respective partitions of BufMappingLock in exclusive mode to insert new data entries.**
+**图8.7 两个进程同时（以独占模式）获取BufMappingLock的相应分区，以插入新数据条目**
 
 ![Fig. 8.7. Two processes simultaneously acquire the respective partitions of BufMappingLock in exclusive mode to insert new data entries.](http://www.interdb.jp/pg/img/fig-8-07.png)![img]()
 
-The buffer table requires many other locks. For example, the buffer table internally uses a spin lock to delete an entry. However, descriptions of these other locks are omitted because they are not required in this document.
+缓冲表需要许多其他的锁。例如，缓冲表内部使用spin lock来删除条目。但是，因为在本文档中不需要，所以这些锁的描述被省略了。
 
-
-
-The BufMappingLock had been split into 16 separate locks by default until version 9.4.
-
-
+在9.4版本之前，在默认情况下，BufMappingLock已被分为16个单独的锁。
 
 ### 8.3.2. Locks for Each Buffer Descriptor
 
-Each buffer descriptor uses two light-weight locks, **content_lock** and **io_in_progress_lock**, to control access to the stored page in the corresponding buffer pool slot. When the values of own fields are checked or changed, a spinlock is used.
+每个缓冲区描述符使用两个轻量级锁，**content_lock**和**io_in_progress_lock**，来控制对相应缓冲池槽中存储页的访问。当自己字段的值被检查或更改时，就使用spinlock。
 
 #### 8.3.2.1. content_lock
 
-The content_lock is a typical lock that enforces access limits. It can be used in *shared* and *exclusive* modes.
+content_lock是一个典型的锁，它强制访问限制。它可以在*共享（shared）* and *独占（exclusive）* 模式下使用。
 
-When reading a page, a backend process acquires a shared content_lock of the buffer descriptor that stores the page.
+当读取一个页时，后端进程获取存储该页的缓冲区描述符的共享content_lock锁。
 
-However, an exclusive content_lock is acquired when doing one of the following:
+但是，当执行以下操作之一时，会获取独占的content_lock锁：
 
-- Inserting rows (i.e. tuples) into the stored page or changing the t_xmin/t_xmax fields of tuples within the stored page (t_xmin and t_xmax are described in [Section 5.2](http://www.interdb.jp/pg/pgsql05.html#_5.2.); simply, when deleting or updating rows, these fields of the associated tuples are changed).
-- Removing tuples physically or compacting free space on the stored page (performed by vacuum processing and HOT, which are described in [Chapters 6](http://www.interdb.jp/pg/pgsql06.html) and [7](http://www.interdb.jp/pg/pgsql07.html), respectively).
-- Freezing tuples within the stored page (freezing is described in [Section 5.10.1](http://www.interdb.jp/pg/pgsql05.html#_5.10.1.) and [Section 6.3](http://www.interdb.jp/pg/pgsql06.html#_6.3.)).
+- 将行（即tuples）插入到存储页或更改存储页面中tuples的t_xmin/t_xmax字段（t_xmin和t_xmax在 [小节 5.2](http://www.interdb.jp/pg/pgsql05.html#_5.2.)中介绍；简单地说，当删除或更新行时，相关tuples的这些字段将被更改)。
 
-The official [README](https://github.com/postgres/postgres/blob/master/src/backend/storage/buffer/README) file shows more details.
+- 物理地移除tuples或压缩存储页面上的空闲空间（通过分别在 [第6章](http://www.interdb.jp/pg/pgsql06.html) and [第7章](http://www.interdb.jp/pg/pgsql07.html)中介绍的vacuum和HOT操作触发，分别在第6章和第7章中描述）。
+
+- 冻结在存储页中的tuples（冻结（freezing）在[小节 5.10.1](http://www.interdb.jp/pg/pgsql05.html#_5.10.1.) and [小节 6.3](http://www.interdb.jp/pg/pgsql06.html#_6.3.)中有所介绍）。
+
+官方[README](https://github.com/postgres/postgres/blob/master/src/backend/storage/buffer/README)文件中有更多详细信息。
 
 #### 8.3.2.2. io_in_progress_lock
 
-The io_in_progress lock is used to wait for I/O on a buffer to complete. When a PostgreSQL process loads/writes page data from/to storage, the process holds an exclusive io_in_progress lock of the corresponding descriptor while accessing the storage.
+io_in_progress锁用于等待缓冲区上的I/O完成。当PostgreSQL进程 从/到 存储中 加载/写入 page页数据时，该进程（在访问存储时）持有相应描述符的独占io_in_progress锁。
 
 #### 8.3.2.3. spinlock
 
-When the flags or other fields (e.g. refcount and usage_count) are checked or changed, a spinlock is used. Two specific examples of spinlock usage are given below:
-
-- (1) The following shows how to **pin** the buffer descriptor:
-
-- - \1. Acquire a spinlock of the buffer descriptor.
-  - \2. Increase the values of its refcount and usage_count by 1.
-  - \3. Release the spinlock.
+当检查或改变标记或其他字段（例如refcount和usage_count)时，使用spinlock。两个spinlock的用例，具体示例如下：
+（1）以下显示了如何pin住缓冲区描述符：
+		 1.获取缓冲区描述符的spinlock。
+		 2.将其refcount和usage_count的值增加1。
+		 3.释放spinlock锁。
 
 - ```c-monosp
   LockBufHdr(bufferdesc);    /* Acquire a spinlock */
@@ -294,11 +321,10 @@ When the flags or other fields (e.g. refcount and usage_count) are checked or ch
   UnlockBufHdr(bufferdesc); /* Release the spinlock */
   ```
 
-- (2) The following shows how to set the dirty bit to '1':
-
-- - \1. Acquire a spinlock of the buffer descriptor.
-  - \2. Set the dirty bit to '1' using a bitwise operation.
-  - \3. Release the spinlock.
+（2）以下显示如何将脏位设置为’1’：
+         1.获取缓冲区描述符的spinlock。
+         2.使用按位操作将脏位设置为“1”。
+         3.释放spinlock锁。
 
 - ```c-monosp
   #define BM_DIRTY             (1 << 0)    /* data needs writing */
@@ -312,117 +338,122 @@ When the flags or other fields (e.g. refcount and usage_count) are checked or ch
   UnlockBufHdr(bufferdesc);
   ```
 
-- Changing other bits is performed in the same manner.
+执行改变其他位，与以上方式相同。
 
+*用原子操作替代缓冲区管理器自旋锁（spinlock）*
 
+在版本9.6中，缓冲区管理器的自旋锁将被替换为原子操作。查看[result of commitfest](https://commitfest.postgresql.org/9/408/)。如果想了解详细信息，请参阅此 [该讨论](http://www.postgresql.org/message-id/flat/2400449.GjM57CE0Yg@dinodell#2400449.GjM57CE0Yg@dinodell)。
 
- *Replacing buffer manager spinlock with atomic operations*
+## 8.4. 缓冲区管理器如何工作
 
-In version 9.6, the spinlocks of buffer manager will be replaced to atomic operations. See this [result of commitfest](https://commitfest.postgresql.org/9/408/). If you want to know the details, refer to [this discussion](http://www.postgresql.org/message-id/flat/2400449.GjM57CE0Yg@dinodell#2400449.GjM57CE0Yg@dinodell).
+本节介绍缓冲区管理器的工作原理。当后端进程想要访问所需页时，它会调用*ReadBufferExtended*函数。
+*ReadBufferExtended*函数的行为取决于三种逻辑情况。每种情况在以下小节中介绍。此外，PostgreSQL clock sweep 页替换算法在最后一节中介绍。
 
+### 8.4.1. **访问存储在缓冲池中的page页**
 
+首先，介绍最简单的情况，即所需的page页已经存储在缓冲池中。在这种情况下，缓冲区管理器执行以下步骤：
 
-## 8.4. How the Buffer Manager Works
+（1）创建所需页的*buffer_tag*（在此示例中，buffer_tag为’Tag_C’）并使用哈希函数计算包含创建的buffer_tag相关联条目的hash bucket slot。
+（2）在共享模式下，获取覆盖哈希桶槽的 BufMappingLock 分区（该锁将在步骤(5)中释放）。
+（3）查找标签为“Tag_C”的条目，并从条目中获取*buffer_id*。在此示例中，buffer_id为2。
+（4）将缓冲区描述符固定为buffer_id 2，即描述符的refcount和usage_count增加1（[小节 8.3.2](http://www.interdb.jp/pg/pgsql08.html#_8.3.2.) 描述了pinning）。
+（5）释放BufMappingLock。
+（6）使用buffer_id 2访问缓冲池槽。
 
-This section describes how the buffer manager works. When a backend process wants to access a desired page, it calls the *ReadBufferExtended* function.
-
-The behavior of the *ReadBufferExtended* function depends on three logical cases. Each case is described in the following subsections. In addition, the PostgreSQL *clock sweep* page replacement algorithm is described in the final subsection.
-
-### 8.4.1. Accessing a Page Stored in the Buffer Pool
-
-First, the simplest case is described, i.e. the desired page is already stored in the buffer pool. In this case, the buffer manager performs the following steps:
-
-- (1) Create the *buffer_tag* of the desired page (in this example, the buffer_tag is 'Tag_C') and compute the *hash bucket slot*, which contains the associated entry of the created *buffer_tag*, using the hash function.
-- (2) Acquire the BufMappingLock partition that covers the obtained hash bucket slot in shared mode (this lock will be released in step (5)).
-- (3) Look up the entry whose tag is 'Tag_C' and obtain the *buffer_id* from the entry. In this example, the buffer_id is 2.
-- (4) Pin the buffer descriptor for buffer_id 2, i.e. the refcount and usage_count of the descriptor are increased by 1 ( [Section 8.3.2](http://www.interdb.jp/pg/pgsql08.html#_8.3.2.) describes pinning).
-- (5) Release the BufMappingLock.
-- (6) Access the buffer pool slot with buffer_id 2.
-
-**Fig. 8.8. Accessing a page stored in the buffer pool.**
+**图 8.8. 访问存储在缓冲池中的页**
 
 ![Fig. 8.8. Accessing a page stored in the buffer pool.](http://www.interdb.jp/pg/img/fig-8-08.png)![img]()
 
-Then, when reading rows from the page in the buffer pool slot, the PostgreSQL process acquires the *shared content_lock* of the corresponding buffer descriptor. Thus, buffer pool slots can be read by multiple processes simultaneously.
+然后，当从缓冲池槽中的页读取行时，PostgreSQL进程获取相应缓冲区描述符的共享content_lock。因此，缓冲池槽可以由多个进程同时读取。
 
-When inserting (and updating or deleting) rows to the page, a Postgres process acquires the *exclusive content_lock* of the corresponding buffer descriptor (note that the dirty bit of the page must be set to '1').
+当向页中插入（以及更新或删除）行时，Postgres进程获取相应缓冲区描述符的*exclusive content_lock* （请注意，页面的脏位必须设置为“1”）。
 
-After accessing the pages, the refcount values of the corresponding buffer descriptors are decreased by 1.
+访问页面后，相应缓冲区描述符的refcount值会减1。
 
-### 8.4.2. Loading a Page from Storage to Empty Slot
+### 8.4.2. 从存储（Storage）加载页到空槽（Empty Slot）
 
-In this second case, assume that the desired page is not in the buffer pool and the freelist has free elements (empty descriptors). In this case, the buffer manager performs the following steps:
+在第二种情况下，假设所需页面不在缓冲池中，并且空闲列表具有空闲元素（空描述符）。在这种情况下，缓冲区管理器执行以下步骤：
+（1）查找缓冲区表 (我们假设它未被找到).
 
-- (1) Look up the buffer table (we assume it is not found).
-  - \1. Create the buffer_tag of the desired page (in this example, the buffer_tag is 'Tag_E') and compute the hash bucket slot.
-  - \2. Acquire the BufMappingLock partition in shared mode.
-  - \3. Look up the buffer table (not found according to the assumption).
-  - \4. Release the BufMappingLock.
-- (2) Obtain the *empty buffer descriptor* from the freelist, and pin it. In this example, the buffer_id of the obtained descriptor is 4.
-- (3) Acquire the BufMappingLock partition in *exclusive* mode (this lock will be released in step (6)).
-- (4) Create a new data entry that comprises the buffer_tag 'Tag_E' and buffer_id 4; insert the created entry to the buffer table.
-- (5) Load the desired page data from storage to the buffer pool slot with buffer_id 4 as follows:
-  - \1. Acquire the exclusive io_in_progress_lock of the corresponding descriptor.
-  - \2. Set the *io_in_progress* bit of the corresponding descriptor to '1 to prevent access by other processes.
-  - \3. Load the desired page data from storage to the buffer pool slot.
-  - \4. Change the states of the corresponding descriptor; the *io_in_progress* bit is set to '0', and the *valid* bit is set to '1'.
-  - \5. Release the io_in_progress_lock.
-- (6) Release the BufMappingLock.
-- (7) Access the buffer pool slot with buffer_id 4.
+​		1.创建所需页面的buffer_tag（在此示例中，buffer_tag为’Tag_E’）并计算哈希桶槽。
 
-**Fig. 8.9. Loading a page from storage to an empty slot.**
+​		2.以共享模式获取BufMappingLock分区。
+
+​		3.查找缓冲区表（根据假设是未被找到的）。
+
+   	4.释放BufMappingLock。
+
+（2）从freelist中获取空缓冲区（*empty buffer*）描述符，并将其固定。在该示例中，获得的描述符的buffer_id是4。
+（3）以独占模式获取BufMappingLock分区（此锁将在步骤（6）中被释放）。
+（4）创建一个由buffer_tag ’Tag_E’和buffer_id 4组成的新数据条目；将创建的条目插入缓冲区表。
+（5）使用buffer_id 4，将所需的页数据从存储加载到缓冲池槽，如下所示：
+
+​		1.获取相应描述符的独占io_in_progress_lock。
+
+​		2.将相应描述符的io_in_progress位设置为1，以防止其他进程访问。
+
+​		3.将所需的页数据从存储加载到缓冲池槽。
+
+​		4.更改相应描述符的状态； io_in_progress 位设置为‘0’，*valid*位设置为‘1’。
+
+​		5.释放io_in_progress_lock。
+（6）释放BufMappingLock。
+（7）使用buffer_id 4访问缓冲池槽。
+
+**图8.9 将页从存储加载到空插槽**
 
 ![Fig. 8.9. Loading a page from storage to an empty slot.](http://www.interdb.jp/pg/img/fig-8-09.png)![img]()
 
-### 8.4.3. Loading a Page from Storage to a Victim Buffer Pool Slot
+### 8.4.3. 将Page页从磁盘（Storage）加载到Victim Buffer Pool Slot
 
-In this case, assume that all buffer pool slots are occupied by pages but the desired page is not stored. The buffer manager performs the following steps:
+在这种情况下，假设所有缓冲池槽都被页占用，但所需的页没有被存储。缓冲区管理器执行以下步骤：
 
-- (1) Create the buffer_tag of the desired page and look up the buffer table. In this example, we assume that the buffer_tag is 'Tag_M' (the desired page is not found).
+（1）创建所需页面的buffer_tag并查找缓冲表。在这个例子中，我们假设buffer_tag是’Tag_M’（所需的页没有被找到）。
+（2）使用clock-sweep算法选择一个victim buffer pool slot，从缓冲区表中获取旧条目，这个旧的条目包含了victim buffer pool slot的buffer_id，并将victim pool slot固定在缓冲区描述符层中。在此示例中， victim slot的buffer_id为5，旧条目为“Tag_F, id = 5”。clock-sweep将在[下一小节](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.)中介绍。
+（3）如果victim页数据是脏的，则刷新改页面（写入和fsync）;否则进入步骤（4）。
+            在使用新数据覆盖之前，必须将脏页写入磁盘(storage)。刷脏页面的步骤如下：
 
-- (2) Select a victim buffer pool slot using the clock-sweep algorithm, obtain the old entry, which contains the buffer_id of the victim pool slot, from the buffer table and pin the victim pool slot in the buffer descriptors layer. In this example, the buffer_id of the victim slot is 5 and the old entry is ‘Tag_F, id=5’. The clock sweep is described in the [next subsection](http://www.interdb.jp/pg/pgsql08.html#_8.4.4.).
+​			1.获取（buffer_id 5的，在步骤6中释放到)描述符的共享content_lock和独占io_in_progress锁。
 
-- (3) Flush (write and fsync) the victim page data if it is dirty; otherwise proceed to step (4).
+​			2.更改相应描述符的状态; io_in_progress位设置为“1”，just_dirtied位设置为“0”。
 
-  The dirty page must be written to storage before overwriting with new data. Flushing a dirty page is performed as follows:
+​			3.根据具体情况，调用XLogFlush()函数将WAL缓冲区上的WAL数据写入当前WAL段文件（详细信息省略; WAL和XLogFlush函数在 [第9章](http://www.interdb.jp/pg/pgsql09.html)中介绍）。
 
-  - \1. Acquire the shared content_lock and the exclusive io_in_progress lock of the descriptor with buffer_id 5 (released in step 6).
-  - \2. Change the states of the corresponding descriptor; the *io_in_progress* bit is set to '1' and the *just_dirtied* bit is set to '0'.
-  - \3. Depending on the situation, the *XLogFlush()* function is invoked to write WAL data on the WAL buffer to the current WAL segment file (details are omitted; WAL and the *XLogFlush* function are described in [Chapter 9](http://www.interdb.jp/pg/pgsql09.html)).
-  - \4. Flush the victim page data to storage.
-  - \5. Change the states of the corresponding descriptor; the *io_in_progress* bit is set to '0' and the *valid* bit is set to '1'.
-  - \6. Release the io_in_progress and content_lock locks.
+​			4.将victim页数据刷新到磁盘。
 
-- (4) Acquire the old BufMappingLock partition that covers the slot that contains the old entry, in exclusive mode.
+​			5.更改相应描述符的状态; io_in_progress位设置为“0”，valid位设置为“1”。
 
-- (5) Acquire the new BufMappingLock partition and insert the new entry to the buffer table:
+​			6.释放io_in_progress和content_lock锁。
 
-  - \1. Create the new entry comprised of the new buffer_tag 'Tag_M' and the victim's buffer_id.
-  - \2. Acquire the new BufMappingLock partition that covers the slot containing the new entry in exclusive mode.
-  - \3. Insert the new entry to the buffer table.
+（4）以独占模式，获取覆盖包含旧条目的插槽的旧BufMappingLock分区。
+（5）获取新的BufMappingLock分区，并将新条目插入缓冲区表：
 
-**Fig. 8.10. Loading a page from storage to a victim buffer pool slot.**
+​			1.创建由新buffer_tag’ Tag_M’和victim的buffer_id组成的新条目。
+
+​			2.以独占模式获取覆盖包含新条目的插槽的新BufMappingLock分区。
+
+​			3.将新条目插入缓冲区表。
+
+**表 8.10. 将page页从磁盘（storage）加载到victim buffer pool slot**
 
 ![Fig. 8.10. Loading a page from storage to a victim buffer pool slot.](http://www.interdb.jp/pg/img/fig-8-10.png)![img]()
 
-- (6) Delete the old entry from the buffer table, and release the old BufMappingLock partition.
-- (7) Load the desired page data from the storage to the victim buffer slot. Then, update the flags of the descriptor with buffer_id 5; the dirty bit is set to '0 and initialize other bits.
-- (8) Release the new BufMappingLock partition.
-- (9) Access the buffer pool slot with buffer_id 5.
+（6）从缓冲表中删除旧条目，并释放旧的BufMappingLock分区。
+（7）将所需的页从磁盘加载到victim buffer slot。然后，更新buffer_id为5的描述符的标记；脏位设置为’0’,并初始化其他位。
+（8）释放新的BufMappingLock分区。
+（9）使用buffer_id 5访问缓冲池槽。
 
-**Fig. 8.11. Loading a page from storage to a victim buffer pool slot (continued from Fig. 8.10).**
+**图8.11 将页面从磁盘加载到victim buffer pool slot（接续前面 图 8.10)**
 
 ![Fig. 8.11. Loading a page from storage to a victim buffer pool slot (continued from Fig. 8.10).](http://www.interdb.jp/pg/img/fig-8-11.png)![img]()
 
-### 8.4.4. Page Replacement Algorithm: Clock Sweep
+### 8.4.4. Page页替换算法: Clock Sweep
 
-The rest of this section describes the **clock-sweep** algorithm. This algorithm is a variant of NFU (Not Frequently Used) with low overhead; it selects less frequently used pages efficiently.
+本节的其余部分介绍了**clock-sweep**算法。该算法是一个NFU（Not Frequently Used）的变体，具有低开销；它能有效地选择不常使用的页。
 
-Imagine buffer descriptors as a circular list (Fig. 8.12). The nextVictimBuffer, an unsigned 32-bit integer, is always pointing to one of the buffer descriptors and rotates clockwise. The pseudocode and description of the algorithm are follows:
+将缓冲区描述符设想为一个循环列表（图 8.12）。 nextVictimBuffer是一个无符号的32位整数，它总是指向一个缓冲区描述符并顺时针旋转。伪代码和算法描述如下：
 
-
-
- *Pseudocode: clock-sweep*
+> *Pseudocode: clock-sweep*
 
 ```c
      WHILE true
@@ -439,24 +470,61 @@ Imagine buffer descriptors as a circular list (Fig. 8.12). The nextVictimBuffer,
 (5) RETURN buffer_id of the victim
 ```
 
-- (1) Obtain the candidate buffer descriptor pointed to by *nextVictimBuffer*.
-- (2) If the candidate buffer descriptor is *unpinned*, proceed to step (3); otherwise, proceed to step (4).
-- (3) If the *usage_count* of the candidate descriptor is *0*, select the corresponding slot of this descriptor as a victim and proceed to step (5); otherwise, decrease this descriptor's *usage_count* by 1 and proceed to step (4).
-- (4) Advance the nextVictimBuffer to the next descriptor (if at the end, wrap around) and return to step (1). Repeat until a victim is found.
-- (5) Return the buffer_id of the victim.
+> （1）获取nextVictimBuffer指向的候选缓冲区描述符.
+> （2）如果候选缓冲区描述符的状态是unpinning，则进入步骤(3);否则进入步骤(4)。
+> （3）如果候选描述符的usage_count为0，则选择该描述符的对应槽作为一个victim，并进入步骤(5)；否则，将此描述符的usage_count减1，并继续执行步骤(4)。
+> （4）将nextVictimBuffer推进到下一个描述符（如果到了最后，则绕回去）并返回步骤(1)。重复直到找到victim.
+> （5）返回victim的buffer_id.
 
+具体的例子如 图 8.12 所示。缓冲区描述符显示为蓝色或青色框，框中的数字显示每个描述符的usage_count。
 
-
-A specific example is shown in Fig. 8.12. The buffer descriptors are shown as blue or cyan boxes, and the numbers in the boxes show the usage_count of each descriptor.
-
-**Fig. 8.12. Clock Sweep.**
+**图 8.12. Clock Sweep.**
 
 ![Fig. 8.12. Clock Sweep.](http://www.interdb.jp/pg/img/fig-8-12.png)![img]()
 
-- 1) The nextVictimBuffer points to the first descriptor (buffer_id 1); however, this descriptor is skipped because it is pinned.
-- 2) The nextVictimBuffer points to the second descriptor (buffer_id 2). This descriptor is unpinned but its usage_count is 2; thus, the usage_count is decreased by 1 and the nextVictimBuffer advances to the third candidate.
-- 3) The nextVictimBuffer points to the third descriptor (buffer_id 3). This descriptor is unpinned and its usage_count is 0; thus, this is the victim in this round.
+​	1）nextVictimBuffer指向第一个描述符（buffer_id 1）；但是，此描述符被跳过，因为它的状态是pinned。
+​	2）nextVictimBuffer指向第二个描述符（buffer_id 2）。此描述符的状态是unpinned，但其usage_count为2；因此，usage_count减少1，nextVictimBuffer前进到第三候选缓存区。
+​	3）nextVictimBuffer指向第三个描述符（buffer_id 3）。状态描述符为unpinned，其usage_count为0；因此，被选为本轮的victim。
 
-Whenever the *nextVictimBuffer* sweeps an unpinned descriptor, its *usage_count* is decreased by 1. Therefore, if unpinned descripters exist in the buffer pool, this algorithm can always find a victim, whose usage_count is 0, by rotating the *nextVictimBuffer*.
+每当*nextVictimBuffer*扫描unpinned的描述符时，其usage_count减少1。因此，如果缓冲池中存在unpinned的描述符，则此算法始终可以通过旋转nextVictimBuffer，找到其usage_count为0的victim。
 
-## 8.5. Ring Buffer
+## 8.5. 环形缓冲区（Ring Buffer）
+
+在读或写大表时，PostgreSQL使用**环形缓冲区（ring buffer）** 而不是缓冲池。环形缓冲区是一个小的并且临时的缓冲区域。当满足下面列出的任何条件时，将为共享内存分配一个环形缓冲区：
+
+**1.bulk-reading**
+	当扫描的对象大小超过缓冲池大小四分之一（shared_buffers/4)时。这种情况下，环形缓冲区大小为256KB。
+
+**2.bulk-writing**
+	执行下面列出的SQL命令时，环形缓冲区大小为16MB。
+
+​	[COPY FROM](http://www.postgresql.org/docs/current/static/sql-copy.html)命令。
+​	[CREATE TABLE AS](http://www.postgresql.org/docs/current/static/sql-createtableas.html)命令。
+​	[CREATE MATERIALIZED VIEW](http://www.postgresql.org/docs/current/static/sql-creatematerializedview.html)或[REFRESH MATERIALIZED VIEW](http://www.postgresql.org/docs/current/static/sql-refreshmaterializedview.html)命令。
+​	[ALTER TABLE](http://www.postgresql.org/docs/current/static/sql-altertable.html)命令。
+**3.vacuum processing**
+   当autovacuum执行vacuum处理时。这种情况下，环形缓冲区大小为256KB。
+
+分配的环形缓冲区在使用后立即释放。
+
+环形缓冲区的好处是显而易见的。在不使用环形缓冲区的情况下，如果后端进程读取一个巨大的表，所有存储在缓存池的页面被删除(踢出)；那么，缓存命中率就会降低。环形缓冲区可以有效的避免此类问题。
+
+> **为什么批量读取（bulk-reading）和vacuum的默认环形缓冲区大小为256KB?**
+> 为什么是256KB？答案在缓冲区管理器的源码目录下的[README](https://github.com/postgres/postgres/blob/master/src/backend/storage/buffer/README)中有解释。
+>
+> > 对于顺序扫描，使用256KB环。这么小的尺寸在L2级缓存是合适的，这使得从OS缓存到共享缓冲区缓存的页传输效率更高。在通常情况下再更小一些也是足够了，但是环必须足够大，以同时容纳扫描到的同时pin住的所有页。(截断)
+
+## 8.6. 冲刷脏页（Flushing Dirty Pages）
+
+除了替换victim页面之外，checkpointer和后台写进程（ background writer processes ）将脏页面刷到磁盘。两个进程都具有相同的功能（冲刷脏页）；但是，它们有不同的作用和行为。
+
+checkpointer进程将checkpoint record（检查点记录）写入WAL段文件，并在检查点开始时刷脏页。[小节 9.7](http://www.interdb.jp/pg/pgsql09.html#_9.7.) 介绍了检查点以及何时开始。
+
+后台写进程的作用是减少检查点的密集写的影响。后台写进程持续一点一点地刷脏页面，对数据库活动的影响最小。默认情况下，后台写进程每隔200毫秒唤醒（由 [bgwriter_delay](http://www.postgresql.org/docs/current/static/runtime-config-resource.html#GUC-BGWRITER-DELAY)定义）并最大限度刷[bgwriter_lru_maxpages](http://www.postgresql.org/docs/current/static/runtime-config-resource.html#GUC-BGWRITER-LRU-MAXPAGES)（默认值为100个页）。
+
+> **checkpointer为什么与后台写进程是分开的？**
+> 在版本9.1及之前，后台写进程定期执行检查点处理。在版本9.2中，checkpointer进程已与后台写进程分开。原因记录在一篇标题为“[Separating bgwriter and checkpointer](https://www.postgresql.org/message-id/CA%2BU5nMLv2ah-HNHaQ%3D2rxhp_hDJ9jcf-LL2kW3sE4msfnUw9gA%40mail.gmail.com)”的提议中，其中一些内容如下所示：
+>
+> > 目前（2011年），bgwriter进程执行后台写、检查点和其他一些职责。这意味着，在不停止后台写入的情况下，无法执行最终检查点fsync，因此在一个进程中执行这两项操作会产生负面的性能影响。
+> > 此外，我们在9.2中的目标是，用latch代替polling loop以降低资源使用。 bgwriter loop的复杂性很高，似乎不太可能采用使用latch的这样的干净方法。（截断）
+
