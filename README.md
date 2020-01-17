@@ -14,17 +14,17 @@
   本文档的[中文版本](https://item.jd.com/12527505.html)已于2019年5月出版。
 
 ## 内容
-1. [Database Cluster, Databases and Tables](ch1.md)
-2. [Process and Memory Architecture](ch2.md)
-3. [Query Processing](ch3.md)
-4. [Foreign Data Wrappers (FDW) and Parallel Query](ch4.md)
+1. [数据库集群、数据库和表Database Cluster, Databases and Tables](ch1.md)
+2. [进程和内存架构Process and Memory Architecture](ch2.md)
+3. [查询处理Query Processing](ch3.md)
+4. [外部数据封装器和并行查询Foreign Data Wrappers (FDW) and Parallel Query](ch4.md)
 5. [Concurrency Control](ch5.md)
 6. [VACUUM Processing](ch6.md)
 7. [Heap Only Tuple (HOT) and Index-Only Scans](ch7.md)
-8. [Buffer Manager](ch8.md)
+8. [缓冲区管理器Buffer Manager](ch8.md)
 9. [Write Ahead Logging (WAL)](ch9.md)
-10. [Base Backup and Point-In-Time Recovery (PITR)](ch10.md)
-11. [Streaming Replication](ch11.md)
+10. [基础备份和基于时间点的恢复Base Backup and Point-In-Time Recovery (PITR)](ch10.md)
+11. [流复制Streaming Replication](ch11.md)
 
 ## 导览图
 
