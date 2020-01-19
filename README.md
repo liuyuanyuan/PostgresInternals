@@ -22,7 +22,7 @@
 6. [VACUUM Processing](ch6.md)
 7. [Heap Only Tuple (HOT) and Index-Only Scans](ch7.md)
 8. [缓冲区管理器Buffer Manager](ch8.md)
-9. [Write Ahead Logging (WAL)](ch9.md)
+9. [预写日志Write Ahead Logging (WAL)](ch9.md)
 10. [基础备份和基于时间点的恢复Base Backup and Point-In-Time Recovery (PITR)](ch10.md)
 11. [流复制Streaming Replication](ch11.md)
 

@@ -1,29 +1,29 @@
-# Chapter 9  Write Ahead Logging — WAL
+# 9 预写日志 — WAL
 
-**Transaction log** is an essential part of database, because all of the database management system is required not to lose any data even when a system failure occurs. It is a history log of all changes and actions in a database system so as to ensure that no data has been lost due to failures, such as a power failure, or some other server failure that causes the server crash. As the log contains sufficient information about each transaction executed already, the database server should be able to recover the database cluster by replaying changes and actions in the transaction log in case of the server crash.
+**事务日志（Transaction log）**是数据库的重要组成部分，因为即使发生系统故障，都要求所有数据库管理系统必须不丢失任何数据。它是数据库系统中所有更改和操作的历史日志，以确保不会因诸如电源故障或其他导致服务器崩溃的服务器故障之类的故障，而丢失任何数据。由于日志包含有关已经执行的每个事务的足够信息，因此在服务器崩溃的情况下，数据库服务器应该能够通过重演事务日志中的更改和操作来恢复数据库集群。
 
-In the field of computer science, **WAL** is an acronym of **Write Ahead Logging**, which is a protocol or a rule to write both changes and actions into a transaction log, whereas in PostgreSQL, WAL is an acronym of **Write Ahead Log**. There the term is used as synonym of transaction log, and also used to refer to an implemented mechanism related to writing action to a transaction log (WAL). Though this is a little confusing, in this document the PostgreSQL definition has been adopted.
+在计算机科学领域，**WAL**是**Write Ahead Logging **的首字母缩写，是一种将更改和动作都写入事务日志的协议或规则；而在PostgreSQL中，**WAL**是**Write Ahead Log**的首字母缩写。此处，该术语用作事务日志的同义词，还用于指代与将操作写入事务日志（WAL）有关的已实现机制。尽管这有点令人困惑，但在本文档中采用了PostgreSQL中的定义。
 
-The WAL mechanism was first implemented in version 7.1 to mitigate the impacts of server crashes. It also made possible the implementation of the Point-in-Time Recovery (PITR) and Streaming Replication (SR), both of which are described in [Chapter 10](http://www.interdb.jp/pg/pgsql10.html) and [Chapter 11](http://www.interdb.jp/pg/pgsql11.html) respectively.
+WAL机制最初是在版本7.1中实现的，目的是减轻服务器崩溃的影响。这也使时间点恢复（PITR）和流复制（SR）的实现成为可能，这两者将在[第10章](http://www.interdb.jp/pg/pgsql10.html) and [第11章](http://www.interdb.jp/pg/pgsql11.html)分别介绍。
 
-Although understanding of the WAL mechanism is essential for system integrations and administrations using PostgreSQL, the complexity of this mechanism makes it impossible to summarize its description in brief. So the complete explanation of WAL in PostgreSQL is made as follows. In the first section, the overall picture of the WAL has been provided, introducing some important concepts and keywords. In the subsequent sections, the following topics are described:
+尽管对WAL机制的理解对于使用PostgreSQL进行系统集成和管理至关重要，但该机制的复杂性使得无法简要概述它。因此，对PostgreSQL中WAL的完整解释如下。在第一部分中，提供了WAL的总体情况，介绍了一些重要的概念和关键字。在随后的部分中，介绍了以下主题：
 
-- The logical and physical structures of the WAL (transaction log)
-- The internal layout of WAL data
-- Writing of WAL data
-- WAL writer process
-- The checkpoint processing
-- The database recovery processing
-- Managing WAL segment files
-- Continuous archiving
+- WAL (事务日志) 的逻辑和物理结构
+- WAL数据的内部布局
+- WAL数据的写入
+- WAL写入处理过程
+- checkpoint处理过程
+- 数据库恢复处理过程
+- 管理 WAL 段文件
+- 连续归档
 
-## 9.1. Overview
+## 9.1. 综述
 
-Let's take a look at the overview of the WAL mechanism. To clarify the issue the WAL has been working on, the first subsection shows what happens when a crash occurs if PostgreSQL does not implement WAL. The second subsection introduces some key concepts and shows the overview of the main subjects in this chapter, the writing of WAL data and the database recovery processing. The final subsection completes the overview of the WAL, adding one more key concept.
+让我们看一下WAL机制的综述。为了阐明WAL在处理的问题，第一节介绍了如果PostgreSQL未实现WAL，那么当崩溃时发生的情况。第二部分介绍一些关键概念，并概述本章的主要主题 - WAL数据的写入和数据库恢复处理。最后一节完成了WAL的概述，并添加了另一个关键概念。
 
-In this section, to simplify the description, the table TABLE_A which contains just one page has been used.
+在本节中，为了简化说明，使用了仅包含一个page页的表TABLE_A。
 
-### 9.1.1. Insertion Operations without WAL
+### 9.1.1. 没有WAL时的插入操作
 
 As described in [Chapter 8](http://www.interdb.jp/pg/pgsql08.html), to provide efficient access to the relation's pages, every DBMS implements shared buffer pool.
 
