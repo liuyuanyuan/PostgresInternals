@@ -11,15 +11,15 @@
 
 ## 1.1. 数据库集簇的逻辑
 
-一个**数据库集簇**是指由一个PostgreSQL服务管理的一系列数据库的集合. 如果你是初次听到此定义，你可能会感到疑惑，PostgreSQL中的‘数据库集簇’并**不表示**一组数据库服务，一个PostgreSQL服务运行在在一个主机上，并管理一个独立的数据库集簇。
+一个**数据库集簇(database cluster)**是指由一个PostgreSQL服务管理的一系列数据库的集合。如果你是初次听到此定义，你可能会感到疑惑，PostgreSQL中的”数据库集簇“**不表示**数据库服务的集合，而是运行在一个主机上的一个PostgreSQL服务，管理一个独立的数据库集簇。
 
-图1.1 展示了一个数据库集簇的逻辑结构。*数据库*是*数据库对象*的集合。在关系数据库理论中，*数据库对象*是一种用于存储或引用数据的数据结构。 其中一个典型的例子是*（堆）表*，还有其他的，例如：索引、序列、试图、函数等等。在PostgreSQL中，数据库本身也是数据库对象，并且数据库之间在逻辑上相互独立。所有其他的数据库对象（比如：表、索引等）都属于相应的数据库。
+图1.1 展示了一个数据库集簇的逻辑结构。*数据库*是*数据库对象*的集合。在关系数据库理论中，*数据库对象*是一种用于存储或引用数据的数据结构。 其中一个典型的例子是*（堆）表*，还有其他的，例如：索引、序列、视图、函数等等。在PostgreSQL中，数据库本身也是数据库对象，并且数据库之间在逻辑上相互独立。所有其他的数据库对象（比如：表、索引等）都属于相应的数据库。
 
 **表 1.1. 一个数据库集簇的逻辑结构**
 
-![Fig. 1.1. Logical structure of a database cluster.](http://www.interdb.jp/pg/img/fig-1-01.png)![img]()
+![Fig. 1.1. Logical structure of a database cluster.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-01.png)![img]()
 
-PostgreSQL中的所有数据库对象都由相应的**对象标识符（OID）**在内部进行管理，这些对象标识符是无符号的4字节整数。数据库对象及其对应的OID，根据对象的类型，存储在恰当的 [系统目录](http://www.postgresql.org/docs/current/static/catalogs.html) 中。例如：数据库的和堆表的OID分别存储在*pg_database和pg_class*中，因此你可以通过发出像下面这样的查询来查找他们的OID：
+PostgreSQL中的所有数据库对象都由相应的**对象标识符（OID）**在内部进行管理，这些对象标识符是无符号的4字节整数。数据库对象及其对应的OID，根据对象的类型，存储在恰当的 [系统目录](http://www.postgresql.org/docs/current/static/catalogs.html) 中。例如：数据库的和堆表的OID分别存储在*pg_database和pg_class*中，因此你可以通过发出如下查询来查看他们的OID：
 
 ```sql-monosp
 sampledb=# SELECT datname, oid FROM pg_database WHERE datname = 'sampledb';
@@ -39,13 +39,13 @@ sampledb=# SELECT relname, oid FROM pg_class WHERE relname = 'sampletbl';
 
 一个*数据库集簇*本质上是一个目录，通常被称做**基础目录**，它包含一些子目录和许多文件。如果你执行[initdb](http://www.postgresql.org/docs/current/static/app-initdb.html)实用程序来初始化一个新的数据库集簇，则会在指定的目录下创建一个基础目录。虽然不是强制的，但基础目录的路径通常设置到环境变量*PGDATA*中。
 
-图 1.2 展示了一个PostgreSQL中数据库集簇的示例。一个数据库是*base*子目录下的一个子目录，每个表和索引（至少）是一个存储在其所属数据库子目录下的文件。另外，还有几个包含特定数据和配置文件的子目录。尽管PostgreSQL支持*表空间*，但该术语的含义不同于其他RDBMS。PostgreSQL中表空间是一个目录，含有基础目录之外的一些数据。
+图1.2 展示了一个PostgreSQL数据库集簇的示例。一个数据库是*base*子目录下的一个子目录，每个表和索引（至少）是一个存储在其所属数据库子目录下的文件。另外，还有几个包含特定数据和配置文件的子目录。尽管PostgreSQL支持*表空间*，但该术语的含义不同于其他RDBMS。PostgreSQL中表空间是一个目录，含有基础目录之外的一些数据。
 
 **图 1.2. 一个数据库集簇的示例**
 
-![Fig. 1.2. An example of database cluster.](http://www.interdb.jp/pg/img/fig-1-02.png)![img]()
+![Fig. 1.2. An example of database cluster.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-02.png)![img]()
 
-在下面几个小结中，将介绍PostgreSQL中的数据库集簇、数据库、与表和索引关联的数据库文件，以及表空间的布局。
+在下面几节中，将介绍PostgreSQL中的数据库集簇、数据库、与表和索引关联的数据库文件，以及表空间的布局。
 
 ### 1.2.1. 数据库集簇的布局
 
@@ -84,7 +84,7 @@ sampledb=# SELECT relname, oid FROM pg_class WHERE relname = 'sampletbl';
 
 ### 1.2.2. 数据库的布局
 
-一个数据库是*base*子目录下的一个子目录；数据库目录的名字与其OID相同。例如，当数据库*sampledb的 OID是16384，那么它的子目录名称是16384。
+一个数据库是*base*子目录下的一个子目录；数据库目录的名字与其OID相同。例如，当数据库*sampledb*的OID是16384，那么它的子目录名称是16384。
 
 ```
 $ cd $PGDATA
@@ -96,7 +96,7 @@ drwx------  213 postgres postgres  7242  8 26 16:33 16384
 
 每个小于1GB的表或索引都是一个独立的文件，存储在其所属数据库的目录下。表和索引作为数据库对象在内部通过独立的OID管理，而这些数据文件由变量*relfilenode*管理。表和索引的relfilenode值，基本上但并不总是匹配各自的OID，详细说明如下。
 
-让我们查看一下表*sampletbl* 的OID和relfilenode：
+让我们查看一下表*sampletbl*的OID和relfilenode：
 
 ```sql-monosp
 sampledb=# SELECT relname, oid, relfilenode FROM pg_class WHERE relname = 'sampletbl';
@@ -149,7 +149,7 @@ $ ls -la -h base/16384/19427*
 
 在构建PostgreSQL时，可以使用配置选项--with-segsize更改表和索引的最大文件大小。
 
-仔细查看数据库子目录，您会发现每个表都有两个关联文件，分别以“ *fsm*”和“ *vm*”为后缀。它们分别称为**free space map** 和 **visibility map**，分别在表文件中的每一页上存储可用空间容量和可见性的信息 (请参阅 [小节 5.3.4](http://www.interdb.jp/pg/pgsql05.html#5.3.4.) 和 [小节 6.2](http://www.interdb.jp/pg/pgsql06.html#_6.2.) 获取更多详细信息）。索引仅具有单独的free space maps，而没有visibility map。
+仔细查看数据库子目录，您会发现每个表都有两个关联文件，分别以“ *fsm*”和“ *vm*”为后缀。它们分别称为**空闲空间映射（free space map）** 和 **可见性映射（visibility map）**，分别在表文件中的每一页上存储可用空间容量和可见性的信息 (详情请参阅 [第5.3.4节](http://www.interdb.jp/pg/pgsql05.html#5.3.4.) 和 [第6.2节](http://www.interdb.jp/pg/pgsql06.html#_6.2.) ）。索引仅具有单独的free space maps，而没有visibility map。
 
 一个具体示例如下：
 
@@ -165,13 +165,13 @@ $ ls -la base/16384/18751*
 
 ### 1.2.4. 表空间
 
-PostgreSQL中的*tablespace*是基础目录之外的额外数据区域。此功能已在8.0版中实现。
+PostgreSQL中的*表空间（tablespace）*是基础目录之外的额外数据区域。此功能已在8.0版中实现。
 
-图1.3 显示了一个表空间的内部布局，以及与主数据区域的关系。
+图1.3 展示了一个表空间的内部布局，及其与主数据区域的关系。
 
-**图 1.3. 数据库集簇中的一个表空间
+**图 1.3. 数据库集簇中的一个表空间**
 
-![Fig. 1.3. A Tablespace in the Database Cluster.](http://www.interdb.jp/pg/img/fig-1-03.png)
+![Fig. 1.3. A Tablespace in the Database Cluster.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-03.png)
 ![img]()
 
 一个表空间创建的位置是在发出 [CREATE TABLESPACE](http://www.postgresql.org/docs/current/static/sql-createtablespace.html) 语句时指定的路径。并且，在那个路径下，特定版本的子路径 (例如： PG_9.4_201409291) 会被创建。 特定版本的子目录的命名方法如下所示。
@@ -217,13 +217,13 @@ sampledb=# SELECT pg_relation_filepath('newtbl');
 
 ## 1.3. 一个堆表文件的内部布局
 
-在数据文件（堆表和索引，以及free space map和visibility map）内部，该文件分为固定长度的**页（pages）**（或**块（blocks）**），默认为8192字节（8 KB）。每个文件中的那些页面从0开始按顺序编号，这些编号称为**块编号（**block numbers）**。如果文件已填满，PostgreSQL将在文件末尾添加一个新的空白页以增加文件大小。
+在数据文件（堆表和索引，以及free space map和visibility map）内部，该文件分为固定长度的**页（pages）**（或**块（blocks）**），默认为8192字节（8 KB）。每个文件中的那些页从0开始按顺序编号，这些编号称为**块编号（block numbers）**。如果文件已填满，PostgreSQL将在文件末尾添加一个新的空白页以增加文件大小。
 
-页的内部布局取决于数据文件的类型。在本小节中，将介绍表的布局，因为后边章节将需要这些信息。
+页的内部布局取决于数据文件的类型。在本节中，将介绍表的布局，因为后边章节将需要这些信息。
 
 **图 1.4. 一个堆表文件的页的布局**
 
-![Fig. 1.4. Page layout of a heap table file.](http://www.interdb.jp/pg/img/fig-1-04.png)![img]()
+![Fig. 1.4. Page layout of a heap table file.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-04.png)![img]()
 
 一个表中的一个页包含三种数据，描述如下:
 
@@ -243,9 +243,9 @@ sampledb=# SELECT pg_relation_filepath('newtbl');
 
 为了标识表中的元组，内部使用了**元组标识符（TID）**。 一个TID包含一对值：包含元组的页的*块号block number*和指向元组的行指针的*偏移量（offset number）*。其用法的一个典型例子是索引。详情参见 [小结 1.4.2](http://www.interdb.jp/pg/pgsql01.html#_1.4.2.).
 
-PageHeaderData 结构定义在 [src/include/storage/bufpage.h](https://github.com/postgres/postgres/blob/master/src/include/storage/bufpage.h)中。
+结构体PageHeaderData定义在 [src/include/storage/bufpage.h](https://github.com/postgres/postgres/blob/master/src/include/storage/bufpage.h)中。
 
-此外，大小超过2 KB (约为8 KB的 1/4 )堆元组，是通过一个称作 **TOAST** (The Oversized-Attribute Storage Technique)的方法来管理和存储的。详情参见[PostgreSQL 官网文档](http://www.postgresql.org/docs/current/static/storage-toast.html) 。
+此外，大小超过2 KB (约为8 KB的 1/4 )的堆元组，是通过一个称作 **TOAST** (The Oversized-Attribute Storage Technique)的方法来管理和存储的。详情请参阅PostgreSQL 官网文档](http://www.postgresql.org/docs/current/static/storage-toast.html) 。
 
 ## 1.4. 写和读元组（tuples）的方法
 
@@ -259,7 +259,7 @@ PageHeaderData 结构定义在 [src/include/storage/bufpage.h](https://github.co
 
 **图 1.5. 一个堆元组的写入**
 
-![Fig. 1.5. Writing of a heap tuple.](http://www.interdb.jp/pg/img/fig-1-05.png)![img]()
+![Fig. 1.5. Writing of a heap tuple.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-05.png)![img]()
 
 ### 1.4.2. 读堆元组
 
@@ -270,31 +270,38 @@ PageHeaderData 结构定义在 [src/include/storage/bufpage.h](https://github.co
 
 **图 1.6. 顺序扫描和索引扫描**
 
-![Fig. 1.6. Sequential scan and index scan.](http://www.interdb.jp/pg/img/fig-1-06.png)![img]()
+![Fig. 1.6. Sequential scan and index scan.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-06.png)![img]()
 
- *Indexes Internals*
+> **内部索引**
+>
+> 本文档未详细介绍索引。要了解它们，建议阅读以下所示的很有用的文章：
+>
+> - [ PostgreSQL中的索引 — 1](https://postgrespro.com/blog/pgsql/3994098)
+> - [PostgreSQL中的索引 — 2](https://postgrespro.com/blog/pgsql/4161264)
+> - [PostgreSQL中的索引 — 3 (Hash)](https://postgrespro.com/blog/pgsql/4161321)
+> - [PostgreSQL中的索引 — 4 (Btree)](https://postgrespro.com/blog/pgsql/4161516)
+> - [PostgreSQL中的索引 — 5 (GiST)](https://postgrespro.com/blog/pgsql/4175817)
+> - [PostgreSQL中的索引 — 6 (SP-GiST)](https://habr.com/en/company/postgrespro/blog/446624/)
+> - [PostgreSQL中的索引 — 7 (GIN)](https://habr.com/en/company/postgrespro/blog/448746/)
+> - [PostgreSQL — 9 (BRIN)](https://habr.com/en/company/postgrespro/blog/452900/)
 
-本文档未详细介绍索引。要了解它们，我建议阅读以下所示的很有用的文章：
 
-- [ PostgreSQL中的索引 — 1](https://postgrespro.com/blog/pgsql/3994098)
-- [PostgreSQL中的索引 — 2](https://postgrespro.com/blog/pgsql/4161264)
-- [PostgreSQL中的索引 — 3 (Hash)](https://postgrespro.com/blog/pgsql/4161321)
-- [PostgreSQL中的索引 — 4 (Btree)](https://postgrespro.com/blog/pgsql/4161516)
-- [PostgreSQL中的索引 — 5 (GiST)](https://postgrespro.com/blog/pgsql/4175817)
-- [PostgreSQL中的索引 — 6 (SP-GiST)](https://habr.com/en/company/postgrespro/blog/446624/)
-- [PostgreSQL中的索引 — 7 (GIN)](https://habr.com/en/company/postgrespro/blog/448746/)
-- [PostgreSQL — 9 (BRIN)](https://habr.com/en/company/postgrespro/blog/452900/)
 
-PostgreSQL也支持 TID-Scan、[Bitmap-Scan](https://wiki.postgresql.org/wiki/Bitmap_Indexes) 和 Index-Only-Scan。
+> **提示**
+>
+> PostgreSQL也支持 TID-Scan、[Bitmap-Scan](https://wiki.postgresql.org/wiki/Bitmap_Indexes) 和 Index-Only-Scan。
+>
+> TID-Scan是一种通过使用所需元组的TID直接访问元组的方法。例如，要在表的第0页中找到第1个元组，请发出以下查询：
+>
+> ```
+> sampledb=# SELECT ctid, data FROM sampletbl WHERE ctid = '(0,1)';
+>  ctid  |   data    
+> -------+-----------
+>  (0,1) | AAAAAAAAA
+> (1 row)
+> ```
+>
+> Index-Only-Scan 将会在 [第 7 章](http://www.interdb.jp/pg/pgsql07.html)详细介绍。
 
-TID-Scan是一种通过使用所需元组的TID直接访问元组的方法。例如，要在表的第0页中找到第1个元组，请发出以下查询：
 
-```sql-monosp
-sampledb=# SELECT ctid, data FROM sampletbl WHERE ctid = '(0,1)';
- ctid  |   data    
--------+-----------
- (0,1) | AAAAAAAAA
-(1 row)
-```
 
-Index-Only-Scan 将会在 [第 7 章](http://www.interdb.jp/pg/pgsql07.html)详细介绍。
