@@ -56,6 +56,8 @@ PostgreSQL 允许多个客户端同时连接；配置参数 *[max_connections](h
 | logging collector (logger) | 该进程将错误信息写入日志文件。                               |                                                              |
 | archiver                   | 该进程中执行归档日志记录归档 。                              | [小节 9.10](http://www.interdb.jp/pg/pgsql09.html#_9.10.)    |
 
+> **提示**
+>
 > 此处展示了一个PostgreSQL server的实际进程情况。在下面的示例中，1个 postgres server process（pid为9687），2个backend processes（pid为9697和9717）以及 表2.1 中列出的几个background processes正在运行。另请参阅 图2.1。
 >
 > ```sql
