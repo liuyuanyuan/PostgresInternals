@@ -17,7 +17,7 @@
 
 **表 1.1. 一个数据库集簇的逻辑结构**
 
-![Fig. 1.1. Logical structure of a database cluster.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-01.png)![img]()
+![Fig. 1.1. Logical structure of a database cluster.](images/fig-1-01.png)![img]()
 
 PostgreSQL中的所有数据库对象都由相应的**对象标识符（OID）**在内部进行管理，这些对象标识符是无符号的4字节整数。数据库对象及其对应的OID，根据对象的类型，存储在恰当的 [系统目录](http://www.postgresql.org/docs/current/static/catalogs.html) 中。例如：数据库的和堆表的OID分别存储在*pg_database和pg_class*中，因此你可以通过发出如下查询来查看他们的OID：
 
@@ -43,7 +43,7 @@ sampledb=# SELECT relname, oid FROM pg_class WHERE relname = 'sampletbl';
 
 **图 1.2. 一个数据库集簇的示例**
 
-![Fig. 1.2. An example of database cluster.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-02.png)![img]()
+![Fig. 1.2. An example of database cluster.](images/fig-1-02.png)![img]()
 
 在下面几节中，将介绍PostgreSQL中的数据库集簇、数据库、与表和索引关联的数据库文件，以及表空间的布局。
 
@@ -171,7 +171,7 @@ PostgreSQL中的*表空间（tablespace）*是基础目录之外的额外数据�
 
 **图 1.3. 数据库集簇中的一个表空间**
 
-![Fig. 1.3. A Tablespace in the Database Cluster.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-03.png)
+![Fig. 1.3. A Tablespace in the Database Cluster.](images/fig-1-03.png)
 ![img]()
 
 一个表空间创建的位置是在发出 [CREATE TABLESPACE](http://www.postgresql.org/docs/current/static/sql-createtablespace.html) 语句时指定的路径。并且，在那个路径下，特定版本的子路径 (例如： PG_9.4_201409291) 会被创建。 特定版本的子目录的命名方法如下所示。
@@ -223,7 +223,7 @@ sampledb=# SELECT pg_relation_filepath('newtbl');
 
 **图 1.4. 一个堆表文件的页的布局**
 
-![Fig. 1.4. Page layout of a heap table file.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-04.png)![img]()
+![Fig. 1.4. Page layout of a heap table file.](images/fig-1-04.png)![img]()
 
 一个表中的一个页包含三种数据，描述如下:
 
@@ -259,7 +259,7 @@ sampledb=# SELECT pg_relation_filepath('newtbl');
 
 **图 1.5. 一个堆元组的写入**
 
-![Fig. 1.5. Writing of a heap tuple.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-05.png)![img]()
+![Fig. 1.5. Writing of a heap tuple.](images/fig-1-05.png)![img]()
 
 ### 1.4.2. 读堆元组
 
@@ -270,7 +270,7 @@ sampledb=# SELECT pg_relation_filepath('newtbl');
 
 **图 1.6. 顺序扫描和索引扫描**
 
-![Fig. 1.6. Sequential scan and index scan.](/Users/liuyuanyuan/PostgresInternals/images/fig-1-06.png)![img]()
+![Fig. 1.6. Sequential scan and index scan.](images/fig-1-06.png)![img]()
 
 > **内部索引**
 >
