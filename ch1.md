@@ -15,7 +15,7 @@
 
 图1.1 展示了一个数据库集簇的逻辑结构。*数据库*是*数据库对象*的集合。在关系数据库理论中，*数据库对象*是一种用于存储或引用数据的数据结构。 其中一个典型的例子是*（堆）表*，还有其他的，例如：索引、序列、视图、函数等等。在PostgreSQL中，数据库本身也是数据库对象，并且数据库之间在逻辑上相互独立。所有其他的数据库对象（比如：表、索引等）都属于相应的数据库。
 
-**表 1.1. 一个数据库集簇的逻辑结构**
+**图 1.1. 一个数据库集簇的逻辑结构**
 
 ![Fig. 1.1. Logical structure of a database cluster.](images/fig-1-01.png)
 
@@ -269,7 +269,7 @@ sampledb=# SELECT pg_relation_filepath('newtbl');
 
 **图 1.6. 顺序扫描和索引扫描**
 
-![Fig. 1.6. Sequential scan and index scan.](images/fig-1-06.png)![img]()
+![Fig. 1.6. Sequential scan and index scan.](images/fig-1-06.png)
 
 > **内部索引**
 >
