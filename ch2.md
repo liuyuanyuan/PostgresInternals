@@ -8,25 +8,23 @@ PostgreSQL是一个客户端/服务器类型的关系型数据库管理系统，
 
 协同管理一个数据库集簇的多个进程的集合，通常称作一个*'PostgreSQL 服务'*，它包含以下类型的进程：
 
-- **postgres server process** 是与数据库集群管理相关的所有进程的父进程。
-- 每个 **backend process** 处理由连接的客户端发出的所有查询和语句。
-- 各种 **background processes** 执行各自功能的进程 (例如：VACUUM 和 CHECKPOINT 进程) 以进行数据库管理。
-- 在 **replication associated processes** 中，他们执行流复制。 详细内容在 [第11章](http://www.interdb.jp/pg/pgsql11.html)进行介绍。
-- 在自版本9.3开始支持的 **background worker process** 中，它可以执行用户实现的任何处理。此处不再赘述，请参考 [官方文档](http://www.postgresql.org/docs/current/static/bgworker.html)。
+- **postgres服务进程（postgres server process）** 是与数据库集簇管理相关的所有进程的父进程。
+- 每个 **后端进程（backend process）** 处理由连接的客户端发出的所有查询和语句。
+- 各种 **后台进程（background processes）** 执行各自功能的进程 (例如：VACUUM 和 CHECKPOINT 进程) 以进行数据库管理。
+-  **复制相关进程（replication associated processes）** 中，执行流复制。 详细内容在 [第11章](http://www.interdb.jp/pg/pgsql11.html)进行介绍。
+- 在自版本9.3开始支持的 **后台工作进程（background worker process）** 中，它可以执行用户实现的任何处理。此处不再赘述，请参考 [官方文档](http://www.postgresql.org/docs/current/static/bgworker.html)。
 
 在以下小节中，将详细介绍前三种类型的进程。
 
 **图 2.1. PostgreSQL中进程架构的示例**
 
-![Fig. 2.1. An example of the process architecture in PostgreSQL.](http://www.interdb.jp/pg/img/fig-2-01.png)![img]()
-
-------
+![Fig. 2.1. An example of the process architecture in PostgreSQL.](images/fig-2-01.png)
 
 该图展示了一个PostgreSQL服务的所有进程：1个postgres server进程，2个backend processes，7个background processes和2个client processes。还展示了database cluster、shared memory和2个client processes 。
 
 ### 2.1.1. Postgres Server Process
 
-如上所述，*postgres server process*是PostgreSQL服务中所有进程的父进程。在早期版本中，它被称为 ‘postmaster’。
+如上所述，*postgres server process*是PostgreSQL服务中所有进程的父进程。在早期版本中，它被称为“postmaster”。
 
 通过执行[pg_ctl](http://www.postgresql.org/docs/current/static/app-pg-ctl.html) 实用程序的*start* 选项, 会启动一个 postgres server process。然后，它在内存中分配一个共享内存区域，启动各种后台进程，必要时启动eplication associated processes和background worker processes，并等待来自客户端的连接请求。每当接收到来自客户端的连接请求时，它就会启动一个backend process。 （然后，启动的backend process处理由连接的客户端发出的所有查询。）
 
@@ -46,7 +44,7 @@ PostgreSQL 允许多个客户端同时连接；配置参数 *[max_connections](h
 
 表 2.1 展示了 background processes 的列表。与 postgres server 和 backend process相比，不可能简单地解释每个功能，因为这些功能依赖于独立的指定功能和PostgreSQL内部机制。因此，本章仅作介绍。详细内容将在以下一章中介绍。
 
-**表 2.1: background processes.**
+**表 2.1: background processes**
 
 | process                    | description                                                  | reference                                                    |
 | :------------------------- | :----------------------------------------------------------- | :----------------------------------------------------------- |
@@ -59,23 +57,21 @@ PostgreSQL 允许多个客户端同时连接；配置参数 *[max_connections](h
 | archiver                   | 该进程中执行归档日志记录归档 。                              | [小节 9.10](http://www.interdb.jp/pg/pgsql09.html#_9.10.)    |
 
 > 此处展示了一个PostgreSQL server的实际进程情况。在下面的示例中，1个 postgres server process（pid为9687），2个backend processes（pid为9697和9717）以及 表2.1 中列出的几个background processes正在运行。另请参阅 图2.1。
-
-```
-postgres> pstree -p 9687
--+= 00001 root /sbin/launchd
- \-+- 09687 postgres /usr/local/pgsql/bin/postgres -D /usr/local/pgsql/data
-   |--= 09688 postgres postgres: logger process     
-   |--= 09690 postgres postgres: checkpointer process     
-   |--= 09691 postgres postgres: writer process     
-   |--= 09692 postgres postgres: wal writer process     
-   |--= 09693 postgres postgres: autovacuum launcher process     
-   |--= 09694 postgres postgres: archiver process     
-   |--= 09695 postgres postgres: stats collector process     
-   |--= 09697 postgres postgres: postgres sampledb 192.168.1.100(54924) idle  
-   \--= 09717 postgres postgres: postgres sampledb 192.168.1.100(54964) idle in transaction  
-```
-
-
+>
+> ```sql
+> postgres> pstree -p 9687
+> -+= 00001 root /sbin/launchd
+>  \-+- 09687 postgres /usr/local/pgsql/bin/postgres -D /usr/local/pgsql/data
+>    |--= 09688 postgres postgres: logger process     
+>    |--= 09690 postgres postgres: checkpointer process     
+>    |--= 09691 postgres postgres: writer process     
+>    |--= 09692 postgres postgres: wal writer process     
+>    |--= 09693 postgres postgres: autovacuum launcher process     
+>    |--= 09694 postgres postgres: archiver process     
+>    |--= 09695 postgres postgres: stats collector process     
+>    |--= 09697 postgres postgres: postgres sampledb 192.168.1.100(54924) idle  
+>    \--= 09717 postgres postgres: postgres sampledb 192.168.1.100(54964) idle in transaction  
+> ```
 
 ## 2.2. 内存架构
 
@@ -88,7 +84,7 @@ postgres> pstree -p 9687
 
 **图 2.2.  PostgreSQL中的内存架构**
 
-![Fig. 2.2. Memory architecture in PostgreSQL.](http://www.interdb.jp/pg/img/fig-2-02.png)![img]()
+![Fig. 2.2. Memory architecture in PostgreSQL.](images/fig-2-02.png)
 
 ### 2.2.1. 本地内存区域
 
