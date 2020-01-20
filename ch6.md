@@ -1,4 +1,4 @@
-# Chapter 6  Vacuum Processing
+# (ws)6  Vacuum Processing
 
 Vacuum processing is a maintenance process that facilitates the persistent operation of PostgreSQL. Its two main tasks are *removing dead tuples* and the *freezing transaction ids*, both of which are briefly mentioned in [Section 5.10](http://www.interdb.jp/pg/pgsql05.html#_5.10.).
 

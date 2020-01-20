@@ -1,6 +1,6 @@
-# Chapter 5  Concurrency Control
+# 5  并发控制
 
-Concurrency Control is a mechanism that maintains consistency and isolation, which are two properties of the ACID, when several transactions run concurrently in the database.
+并发控制是一种机制，当数个事务在数据库中同时运行时，它保持ACID的两个属性，即一致性（consistency）和隔离性（isolation）。
 
 There are three broad concurrency control techniques, i.e. *Multi-version Concurrency Control* (MVCC), *Strict Two-Phase Locking* (S2PL), and *Optimistic Concurrency Control* (OCC), and each technique has many variations. In MVCC, each write operation creates a new version of a data item while retaining the old version. When a transaction reads a data item, the system selects one of the versions to ensure isolation of the individual transaction. The main advantage of MVCC is that '*readers don’t block writers, and writers don’t block readers*', in contrast, for example, an S2PL-based system must block readers when a writer writes an item because the writer acquires an exclusive lock for the item. PostgreSQL and some RDBMSs use a variation of MVCC called **Snapshot Isolation (SI)**.
 

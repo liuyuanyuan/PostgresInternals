@@ -1,6 +1,6 @@
 # 3  查询处理
 
-正如 [官方文档](https://www.postgresql.org/docs/current/static/features.html) 所述，PostgreSQL支持大量2011年SQL标准所要求的特性。查询处理是PostgreSQL中最复杂的子系统，它可以有效地处理受支持的SQL。本章概述了该查询处理；尤其是，它专注于查询优化。
+正如 [官方文档](https://www.postgresql.org/docs/current/static/features.html) 所述，PostgreSQL支持大量2011年SQL标准所要求的特性。查询处理是PostgreSQL中最复杂的子系统，它可以有效地处理受支持的SQL。本章概述了查询处理；尤其是，专注于查询优化。
 
 本章包括以下三个部分：
 
@@ -36,7 +36,7 @@ PostgreSQL 支持三种技术上有趣且实用的功能，即 [外部数据封�
 
 **图 3.1. 查询处理**
 
-![Fig. 3.1. Query Processing.](http://www.interdb.jp/pg/img/fig-3-01.png)![img]()
+![Fig. 3.1. Query Processing.](images/fig-3-01.png)
 
 在本节中，提供了这些子系统的概述。由于计划器和执行器非常复杂，因此接下来几节将对这些功能进行详细说明。
 
@@ -56,7 +56,7 @@ testdb=# SELECT id, data FROM tbl_a WHERE id < 300 ORDER BY data;
 
 **图 3.2. 一棵解析树的示例**
 
-![Fig. 3.2. An example of a parse tree.](http://www.interdb.jp/pg/img/fig-3-02.png)![img]()
+![Fig. 3.2. An example of a parse tree.](images/fig-3-02.png)
 
 给SELECT查询中的元素与其对应的解析树中的元素编相同的号。例如，（1）是第一个目标列中的一项同时它是表的字段”id“，（4）是一个WHERE子句，依此类推。
 
@@ -111,7 +111,7 @@ sampledb=# SELECT * FROM employees_list;
 
 **图 3.4. 重写器阶段的示例**
 
-![Fig. 3.4. An example of the rewriter stage.](http://www.interdb.jp/pg/img/fig-3-04.png)![img]()
+![Fig. 3.4. An example of the rewriter stage.](images/fig-3-04.png)
 
 > 由于 PostgreSQL 使用此机制实现视图，因此在版本9.2之前视图时无法更新的。因此，从版本 9.3 开始视图便可以更新；但是，在更新视图方面有很多限制。这些详细内容请参阅 [官方文档](https://www.postgresql.org/docs/current/static/sql-createview.html#SQL-CREATEVIEW-UPDATABLE-VIEWS)。
 
@@ -121,7 +121,7 @@ sampledb=# SELECT * FROM employees_list;
 
 PostgreSQL中的计划器是根据存粹基于成本优化；不支持基于规则优化和提示。此计划器时RDBMS宗最复杂的子系统；因此，本章后续小节将概述计划器。
 
-> *pg_hint_plan*
+> **pg_hint_plan**
 >
 > PostgreSQL 不支持在 SQL 中的计划器提示，并且永远不会支持该特性。如果要在查询中使用提示，涉及*pg_hint_plan*的扩展值得考虑。详情参考 [官方网站](http://pghintplan.osdn.jp/pg_hint_plan.html) 。
 
@@ -142,7 +142,7 @@ testdb=# EXPLAIN SELECT * FROM tbl_a WHERE id < 300 ORDER BY data;
 
 **图 3.5. 一棵简单的计划树 和 计划树与EXPLAIN命令的结果 之间的关系**
 
-![Fig. 3.5. A simple plan tree and the relationship between the plan tree and the result of the EXPLAIN command.](http://www.interdb.jp/pg/img/fig-3-05.png)![img]()
+![Fig. 3.5. A simple plan tree and the relationship between the plan tree and the result of the EXPLAIN command.](images/fig-3-05.png)
 
 一棵计划树由称作 *plan nodes* 的元素组成，并且它连接到*PlannedStmt*结构的 plantree 列表中。 这些元素定义在 [plannodes.h](https://github.com/postgres/postgres/blob/master/src/include/nodes/plannodes.h)。详细内容将在小节 3.3.3 (和小节 3.5.4.2)介绍。
 
@@ -156,11 +156,7 @@ testdb=# EXPLAIN SELECT * FROM tbl_a WHERE id < 300 ORDER BY data;
 
 **图 3.6.  执行器、缓存管理器和临时文件之间的关系**
 
-![Fig. 3.6. The relationship among the executor, buffer manager and temporary files.](http://www.interdb.jp/pg/img/fig-3-06.png)![img]()
-
- 
-
-------
+![Fig. 3.6. The relationship among the executor, buffer manager and temporary files.](images/fig-3-06.png)
 
 ## 3.2. 单表查询（Single-Table query）中的成本估算
 
@@ -170,9 +166,9 @@ PostgreSQL的查询优化时基于成本的。成本是没有维度的值（dime
 
 在PostgreSQL中，有三种成本：**启动（start-up）**, **运行（run）** 和 **总（total）**。total成本是start-up和 run的成本之和；所以，只有start-up和run的成本需单独估计。
 
-- **start-up**成本是获取第一个元组之前所花费的成本。例如，索引扫描结点的start-up成本，是读取索引页以访问目标表中的第一个元组的成本。
-- **run**成本是获取所有元组的成本。
-- **total**成本是start-up和run的成本的和。
+- **启动（start-up）成本**是获取第一个元组之前所花费的成本。例如，索引扫描结点的start-up成本，是读取索引页以访问目标表中的第一个元组的成本。
+- **运行（run）成本**是获取所有元组的成本。
+- **总（total）成本**是启动和运行的成本的和。
 
 [EXPLAIN](https://www.postgresql.org/docs/current/static/sql-explain.html) 命令展示了在每个操作中的start-up和total成本。最简单的示例如下所示：
 
@@ -1430,7 +1426,7 @@ The outermost join is the indexed nested loop join (Line 5); the inner parameter
 
 
 
-## References
+## 参考
 
 - [1] Abraham Silberschatz, Henry F. Korth, and S. Sudarshan, "[Database System Concepts](https://www.amazon.com/dp/0073523321)", McGraw-Hill Education, ISBN-13: 978-0073523323
 - [2] Thomas M. Connolly, and Carolyn E. Begg, "[Database Systems](https://www.amazon.com/dp/0321523067)", Pearson, ISBN-13: 978-0321523068

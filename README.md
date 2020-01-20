@@ -1,10 +1,13 @@
 <img src="http://www.interdb.jp/pg/img/puestas-fauna-mecanica-c.png" align="right"/>
 
-# PostgreSQL 内部剖析
-适用于PostgreSQL数据库管理员和系统开发人员
-> :elephant: 本文翻译自 [Hironobu SUZUKI](http://www.interdb.jp/) 的经典系列博文 [The Internals of PostgreSQL](http://www.interdb.jp/pg/) 。
+# PostgreSQL 内部机制剖析
+本文档适用于PostgreSQL数据库管理人员和系统开发人员。
+> :elephant: 本文翻译自 [Hironobu SUZUKI](http://www.interdb.jp/) 的经典系列文章 [The Internals of PostgreSQL](http://www.interdb.jp/pg/) 。
+
+
 
 ## 介绍
+
   本文档着笔于PostgreSQL内部机制剖析，面向数据库管理员和系统开发人员。
 
   PostgreSQL是一个开源的多用途的关系数据库系统，在世界范围内得到了广泛使用。这是一个集成多个子系统的庞大系统，每个子系统都具有特定的复杂功能并相互协作。对内部机制的理解，对于使用PostgreSQL进行管理和集成是至关重要的，但是它的庞大和复杂性却会阻碍理解过程。本文档的主要目的是：解释每个子系统的工作机制，并提供PostgreSQL的整体概况。
@@ -13,18 +16,23 @@
 
   本文档的[中文版本](https://item.jd.com/12527505.html)已于2019年5月出版。
 
+
+
 ## 内容
+
 1. [数据库集群、数据库和表Database Cluster, Databases and Tables](ch1.md)
 2. [进程和内存架构Process and Memory Architecture](ch2.md)
-3. [查询处理Query Processing](ch3.md)
+3. [40%查询处理Query Processing](ch3.md)
 4. [外部数据封装器和并行查询Foreign Data Wrappers (FDW) and Parallel Query](ch4.md)
-5. [Concurrency Control](ch5.md)
-6. [VACUUM Processing](ch6.md)
-7. [Heap Only Tuple (HOT) and Index-Only Scans](ch7.md)
-8. [缓冲区管理器Buffer Manager](ch8.md)
+5. [0%并发控制Concurrency Control](ch5.md)
+6. [0%VACUUM处理VACUUM Processing](ch6.md)
+7. [0%仅堆元组和仅索引扫描Heap Only Tuple (HOT) and Index-Only Scans](ch7.md)
+8. [30%缓冲区管理器Buffer Manager](ch8.md)
 9. [预写日志Write Ahead Logging (WAL)](ch9.md)
 10. [基础备份和基于时间点的恢复Base Backup and Point-In-Time Recovery (PITR)](ch10.md)
 11. [流复制Streaming Replication](ch11.md)
+
+
 
 ## 导览图
 

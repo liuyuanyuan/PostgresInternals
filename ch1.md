@@ -15,7 +15,7 @@
 
 图1.1 展示了一个数据库集簇的逻辑结构。*数据库*是*数据库对象*的集合。在关系数据库理论中，*数据库对象*是一种用于存储或引用数据的数据结构。 其中一个典型的例子是*（堆）表*，还有其他的，例如：索引、序列、视图、函数等等。在PostgreSQL中，数据库本身也是数据库对象，并且数据库之间在逻辑上相互独立。所有其他的数据库对象（比如：表、索引等）都属于相应的数据库。
 
-**图 1.1. 一个数据库集簇的逻辑结构**
+**图1.1. 一个数据库集簇的逻辑结构**
 
 ![Fig. 1.1. Logical structure of a database cluster.](images/fig-1-01.png)
 
@@ -77,10 +77,10 @@ sampledb=# SELECT relname, oid FROM pg_class WHERE relname = 'sampletbl';
 | pg_stat_tmp/                      | 包含统计子系统的临时文件的子目录。                           |
 | pg_subtrans/                      | 包含子事务状态信息的子目录。                                 |
 | pg_tblspc/                        | 包含指向表空间的符号链接的子目录。                           |
-| pg_twophase/                      | Subdirectory containing state files for prepared transactions |
-| pg_wal/ (Version 10 or later)     | 包含WAL（预写日志）段文件的子目录。在版本10中从原先的* pg_xlog *重命名而来。 |
+| pg_twophase/                      | 包含预备事务的状态文件的子目录。                             |
+| pg_wal/ (Version 10 or later)     | 包含WAL（预写日志）段文件的子目录。在版本10中从原先的*pg_xlog*重命名而来。 |
 | pg_xact/ (Version 10 or later)    | 包含事物提交状态数据的子目录。从版本10的*pg_clog* 重命名而来。CLOG 将在 [小结 5.4](http://www.interdb.jp/pg/pgsql05.html#_5.4.)进行介绍。 |
-| pg_xlog/ (Version 9.6 or earlier) | 包含WAL（预写日志）段文件的子目录。在版本10中将其重命名为* pg_wal *。 |
+| pg_xlog/ (Version 9.6 or earlier) | 包含WAL（预写日志）段文件的子目录。在版本10中将其重命名为*pg_wal*。 |
 
 ### 1.2.2. 数据库的布局
 

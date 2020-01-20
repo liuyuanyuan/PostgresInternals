@@ -1,8 +1,8 @@
-# Chapter 7  Heap Only Tuple and Index-Only Scans
+#  7  Heap Only Tuple and Index-Only Scans
 
-This chapter describes two features related to the index scan, which are the heap only tuple and index-only scans.
+本章介绍两个关于索引扫描的特性，即仅堆元组（heap only tuple）和仅索引扫描（index-only scans）。
 
-## 7.1. Heap Only Tuple (HOT)
+## 7.1. 仅堆元组 (HOT)
 
 The HOT was implemented in version 8.3 to effectively use the pages of both index and table when the updated row is stored in the same table page that stores the old row. The HOT also reduces the necessity of VACUUM processing.
 
