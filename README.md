@@ -20,17 +20,17 @@
 
 ## 内容
 
-1. [数据库集群、数据库和表Database Cluster, Databases and Tables](ch1.md)
-2. [进程和内存架构Process and Memory Architecture](ch2.md)
-3. [40%查询处理Query Processing](ch3.md)
-4. [外部数据封装器和并行查询Foreign Data Wrappers (FDW) and Parallel Query](ch4.md)
-5. [0%并发控制Concurrency Control](ch5.md)
-6. [0%VACUUM处理VACUUM Processing](ch6.md)
-7. [0%仅堆元组和仅索引扫描Heap Only Tuple (HOT) and Index-Only Scans](ch7.md)
-8. [30%缓冲区管理器Buffer Manager](ch8.md)
-9. [预写日志Write Ahead Logging (WAL)](ch9.md)
-10. [基础备份和基于时间点的恢复Base Backup and Point-In-Time Recovery (PITR)](ch10.md)
-11. [流复制Streaming Replication](ch11.md)
+1. [数据库集群、数据库和表](ch1.md) Database Cluster, Databases and Tables
+2. [进程和内存架构](ch2.md) Process and Memory Architecture
+3. [20%查询处理](ch3.md) Query Processing
+4. [外部数据封装器和并行查询](ch4.md) Foreign Data Wrappers (FDW) and Parallel Query
+5. [0%并发控制](ch5.md) Concurrency Control
+6. [0%VACUUM处理](ch6.md) VACUUM Processing
+7. [0%仅堆元组和仅索引扫描](ch7.md) Heap Only Tuple (HOT) and Index-Only Scans
+8. [缓冲区管理器](ch8.md) Buffer Manager
+9. [30%预写式日志](ch9.md) Write Ahead Logging (WAL)
+10. [基础备份和时间点恢复](ch10.md) Base Backup and Point-In-Time Recovery (PITR)
+11. [流复制](ch11.md) Streaming Replication
 
 
 
