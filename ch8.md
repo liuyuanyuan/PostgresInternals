@@ -28,7 +28,9 @@ In this chapter, the PostgreSQL buffer manager is described. The first section p
 
 **图 8.1. 缓冲区管理器、存储和后端进程之间的关系**
 
-![Fig. 8.1. Relations between buffer manager, storage, and backend processes.](http://www.interdb.jp/pg/img/fig-8-01.png)![img]()
+![Fig. 8.1. Relations between buffer manager, storage, and backend processes.](images/fig-8-01.png)
+
+
 
 ## 8.1. 概述
 
@@ -75,7 +77,7 @@ typedef struct buftag
 
 **图 8.2. 后端如何从缓冲区管理器中读取页**
 
-![Fig. 8.2. How a backend reads a page from the buffer manager.](http://www.interdb.jp/pg/img/fig-8-02.png)![img]()
+![Fig. 8.2. How a backend reads a page from the buffer manager.](images/fig-8-02.png)
 
 - （1）读取表或索引页时，后端进程会将包含页的buffer_tag的请求发送到缓冲区管理器。
 - （2）缓冲区管理器会返回buffer_ID（存储了请求页的插槽的）。如果请求的页未存储在缓冲池中，则缓冲区管理器将页面从持久性存储加载到其中一个缓冲池插槽中，然后返回buffer_ID的插槽。
@@ -109,7 +111,7 @@ PostgreSQL缓冲管理器包换三层：即 *缓冲区表（buffer table）*、 
 
 **图 8.3. 缓冲管理器的三层架构**
 
-![Fig. 8.3. Buffer manager's three-layer structure.](http://www.interdb.jp/pg/img/fig-8-03.png)![img]()
+![Fig. 8.3. Buffer manager's three-layer structure.](images/fig-8-03.png)![img]()
 
 - **buffer pool**是一个数组。每个插槽存储一个数据文件页。数组插槽的索引称为*buffer_id*。
 - **buffer descriptors**层是buffer descriptors的数组。每个描述符都与缓冲池插槽有一对一的对应关系, 并持有相应插槽中存储页的元数据。
@@ -124,9 +126,9 @@ PostgreSQL缓冲管理器包换三层：即 *缓冲区表（buffer table）*、 
 
 内置的哈希函数将buffer_tags映射到哈希存储桶插槽。即使哈希存储桶插槽的数量大于缓冲池插槽的数量，也会发生冲突。因此，buffer table使用带*linked lists*方法的*separate chaining*来解决冲突。当数据条目被映射到相同的存储桶插槽时，此方法将条目存储在相同的linked list中，如 图 8.4 所示。
 
-**图 8.4. Buffer table.**
+**图 8.4. 缓冲区表**
 
-![Fig. 8.4. Buffer table.](http://www.interdb.jp/pg/img/fig-8-04.png)![img]()
+![Fig. 8.4. Buffer table.](images/fig-8-04.png)![img]()
 
 一个数据条目包括两个值: 页的buffer_tag和持有页的元数据的描述符的buffer_id。例如, 一个数据条目 “Tag_A, id=1” ，意味着带有buffer_id为1的buffer descriptor 存储标记为tag_A 的页的元数据。
 
@@ -225,7 +227,9 @@ typedef struct sbufdesc
 
 **图 8.5. 缓冲区管理器的初始状态**
 
-![Fig. 8.5. Buffer manager initial state.](http://www.interdb.jp/pg/img/fig-8-05.png)![img]()
+![Fig. 8.5. Buffer manager initial state.](images/fig-8-05.png)
+
+
 
 图8.6 显示了第一页是如何加载的。
 
@@ -238,11 +242,9 @@ typedef struct sbufdesc
 
 **图 8.6 加载第一个page页**
 
-![Fig. 8.6. Loading the first page.](http://www.interdb.jp/pg/img/fig-8-06.png)![img]()
+![Fig. 8.6. Loading the first page.](images/fig-8-06.png)
 
 从freelist中检索的描述符始终持有page页的元数据。换句话说，继续使用的非空描述符不会返回到空闲列表。然而，相关描述符将再次添加到freelist中，并且当发生以下任一情况时，描述符状态将变为’empty’：
-
-Descriptors that have been retrieved from the freelist always hold page's metadata. In other words, non-empty descriptors continue to be used do not return to the freelist. However, related descriptors are added to the freelist again and the descriptor state becomes ‘empty’ when one of the following occurs:
 
 1. 表或索引已被移除。
 2. 数据库已被移除。
@@ -276,7 +278,9 @@ BufMappingLock 被拆分为分区以减少缓冲表中的争用（默认为128�
 
 **图8.7 两个进程同时（以独占模式）获取BufMappingLock的相应分区，以插入新数据条目**
 
-![Fig. 8.7. Two processes simultaneously acquire the respective partitions of BufMappingLock in exclusive mode to insert new data entries.](http://www.interdb.jp/pg/img/fig-8-07.png)![img]()
+![Fig. 8.7. Two processes simultaneously acquire the respective partitions of BufMappingLock in exclusive mode to insert new data entries.](http://www.interdb.jp/pg/img/fig-8-07.png)
+
+
 
 缓冲表需要许多其他的锁。例如，缓冲表内部使用spin lock来删除条目。但是，因为在本文档中不需要，所以这些锁的描述被省略了。
 
@@ -362,7 +366,9 @@ io_in_progress锁用于等待缓冲区上的I/O完成。当PostgreSQL进程 从/
 
 **图 8.8. 访问存储在缓冲池中的页**
 
-![Fig. 8.8. Accessing a page stored in the buffer pool.](http://www.interdb.jp/pg/img/fig-8-08.png)![img]()
+![Fig. 8.8. Accessing a page stored in the buffer pool.](http://www.interdb.jp/pg/img/fig-8-08.png)
+
+
 
 然后，当从缓冲池槽中的页读取行时，PostgreSQL进程获取相应缓冲区描述符的共享content_lock。因此，缓冲池槽可以由多个进程同时读取。
 
@@ -402,7 +408,9 @@ io_in_progress锁用于等待缓冲区上的I/O完成。当PostgreSQL进程 从/
 
 **图8.9 将页从存储加载到空插槽**
 
-![Fig. 8.9. Loading a page from storage to an empty slot.](http://www.interdb.jp/pg/img/fig-8-09.png)![img]()
+![Fig. 8.9. Loading a page from storage to an empty slot.](http://www.interdb.jp/pg/img/fig-8-09.png)
+
+
 
 ### 8.4.3. 将Page页从磁盘（Storage）加载到Victim Buffer Pool Slot
 
@@ -436,7 +444,9 @@ io_in_progress锁用于等待缓冲区上的I/O完成。当PostgreSQL进程 从/
 
 **表 8.10. 将page页从磁盘（storage）加载到victim buffer pool slot**
 
-![Fig. 8.10. Loading a page from storage to a victim buffer pool slot.](http://www.interdb.jp/pg/img/fig-8-10.png)![img]()
+![Fig. 8.10. Loading a page from storage to a victim buffer pool slot.](http://www.interdb.jp/pg/img/fig-8-10.png)
+
+
 
 （6）从缓冲表中删除旧条目，并释放旧的BufMappingLock分区。
 （7）将所需的页从磁盘加载到victim buffer slot。然后，更新buffer_id为5的描述符的标记；脏位设置为’0’,并初始化其他位。
@@ -445,7 +455,9 @@ io_in_progress锁用于等待缓冲区上的I/O完成。当PostgreSQL进程 从/
 
 **图8.11 将页面从磁盘加载到victim buffer pool slot（接续前面 图 8.10)**
 
-![Fig. 8.11. Loading a page from storage to a victim buffer pool slot (continued from Fig. 8.10).](http://www.interdb.jp/pg/img/fig-8-11.png)![img]()
+![Fig. 8.11. Loading a page from storage to a victim buffer pool slot (continued from Fig. 8.10).](http://www.interdb.jp/pg/img/fig-8-11.png)
+
+
 
 ### 8.4.4. Page页替换算法: Clock Sweep
 
@@ -480,7 +492,9 @@ io_in_progress锁用于等待缓冲区上的I/O完成。当PostgreSQL进程 从/
 
 **图 8.12. Clock Sweep.**
 
-![Fig. 8.12. Clock Sweep.](http://www.interdb.jp/pg/img/fig-8-12.png)![img]()
+![Fig. 8.12. Clock Sweep.](http://www.interdb.jp/pg/img/fig-8-12.png)
+
+
 
 ​	1）nextVictimBuffer指向第一个描述符（buffer_id 1）；但是，此描述符被跳过，因为它的状态是pinned。
 ​	2）nextVictimBuffer指向第二个描述符（buffer_id 2）。此描述符的状态是unpinned，但其usage_count为2；因此，usage_count减少1，nextVictimBuffer前进到第三候选缓存区。

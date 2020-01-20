@@ -12,7 +12,9 @@
 
 **图 4.1. FDW的基础概念**
 
-![Fig. 4.1. Basic concept of FDW.](http://www.interdb.jp/pg/img/fig-4-fdw-1.png)![img]()
+![Fig. 4.1. Basic concept of FDW.](images/fig-4-fdw-1.png)
+
+
 
 安装必要的扩展并进行适当的设置后，可以访问远程服务器上的外表。例如，假设有两个远程服务器，即postgresql 和 mysql，它们分别具有表*foreign_pg_tbl*和 表*foreign_my_tbl *。在此例子中，你可以通过从本地服务器发出 SELECT 查询，来访问外部表，如下所示。
 
@@ -53,7 +55,7 @@ PostgreSQL的FDW会在接下来的章节中详细介绍，小节 4.1.1 展示了
 
 **图 4.2.  FDW 运作方式**
 
-![Fig. 4.2. How FDWs perform.](http://www.interdb.jp/pg/img/fig-4-fdw-2.png)![img]()
+![Fig. 4.2. How FDWs perform.](images/fig-4-fdw-2.png)
 
 - (1) 分析器创建输入 SQL 的查询树。
 - (2) 计划器（或执行器）连接到远程服务器。
@@ -101,7 +103,7 @@ localdb=# SELECT * FROM tbl_a AS a WHERE a.id < 10;
 
 **图 4.3. 扫描一个外部表的计划树的示例**
 
-![Fig. 4.3. Example of the plan tree that scans a foreign table.](http://www.interdb.jp/pg/img/fig-4-fdw-3.png)![img]()
+![Fig. 4.3. Example of the plan tree that scans a foreign table.](images/fig-4-fdw-3.png)
 
 mysql_fdw通过查询树为MySQL 重新创建一个 SELECT 文本。使用 [redis_fdw](https://github.com/pg-redis-fdw/redis_fdw) 或者 [rw_redis_fdw](https://github.com/nahanni/rw_redis_fdw) 创建 [SELECT 命令](https://redis.io/commands/select)。
 
@@ -123,7 +125,7 @@ mysql_fdw通过查询树为MySQL 重新创建一个 SELECT 文本。使用 [redi
 
 **图 4.4. 在mysql_fdw中执行 SELECT 查询的典型 SQL 语句顺序**
 
-![Fig. 4.4. Typical sequence of SQL statements to execute a SELECT query in mysql_fdw](http://www.interdb.jp/pg/img/fig-4-fdw-4.png)![img]()
+![Fig. 4.4. Typical sequence of SQL statements to execute a SELECT query in mysql_fdw](images/fig-4-fdw-4.png)
 
 远程服务器的实际日志可以在下面看到；里面将显示远程服务器收到的语句。
 
@@ -135,7 +137,7 @@ mysql> SELECT command_type,argument FROM mysql.general_log;
 ... snip ...
 
 | Query        | SET sql_mode='ANSI_QUOTES'                                            |
-| Prepare      | SELECT `id`, `data` FROM `localdb`.`tbl_a` WHERE ((`id` < 10))         |
+| Prepare      | SELECT `id`, `data` FROM `localdb`.`tbl_a` WHERE ((`id` < 10))        |
 | Close stmt   |                                                                       |
 +--------------+-----------------------------------------------------------------------+
 ```
@@ -162,7 +164,7 @@ mysql> SELECT command_type,argument FROM mysql.general_log;
 
 **图 4.5. postgres_fdw中执行SELECT语句的经典SQL语句顺序**
 
-![Fig. 4.5. Typical sequence of SQL statements to execute a SELECT query in postgres_fdw.](http://www.interdb.jp/pg/img/fig-4-fdw-5.png)![img]()
+![Fig. 4.5. Typical sequence of SQL statements to execute a SELECT query in postgres_fdw.](images/fig-4-fdw-5.png)![img]()
 
 远程服务器的实际日志可以在下面看到。
 
@@ -293,7 +295,9 @@ Merge Cond: (a.id = b.id)
 
 **图 4.6. 在版本9.5或更早版本中，执行多表查询的SQL语句顺序**
 
-![Fig. 4.6. Sequence of SQL statements to execute the Multi-Table Query in version 9.5 or earlier.](http://www.interdb.jp/pg/img/fig-4-fdw-6.png)![img]()
+![Fig. 4.6. Sequence of SQL statements to execute the Multi-Table Query in version 9.5 or earlier.](images/fig-4-fdw-6.png)![img](
+
+
 
 远程服务器的实际日志如下：
 
@@ -379,7 +383,9 @@ Foreign Scan  (cost=134.35..244.45 rows=80 width=16)
 
 **图 4.7. 版本 9.6 或更新版本中，执行远程join操作的SQL语句序列**
 
-![Fig. 4.7. Sequence of SQL statements to execute the remote-join operation in version 9.6 or later.](http://www.interdb.jp/pg/img/fig-4-fdw-7.png)![img]()
+![Fig. 4.7. Sequence of SQL statements to execute the remote-join operation in version 9.6 or later.](images/fig-4-fdw-7.png)
+
+
 
 远程服务器的实际日志如下：
 
@@ -539,4 +545,4 @@ LOG:  statement: COMMIT TRANSACTION
 
 ## 4.2. 并行查询
 
-![img](http://www.interdb.jp/pg/img/udc1.jpg)
+![img](images/udc1.png)
